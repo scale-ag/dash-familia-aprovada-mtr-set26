@@ -1,89 +1,89 @@
-# Dashboard de Captura de Leads · <<PREENCHER: nome do cliente>>
+# Dashboard de Captação de Leads · Núbia Oliveira
 
-Dashboard **100% na nuvem** do Funil de High Ticket de **<<PREENCHER: nome do
-cliente>>** que cruza a aba **Conversas** (leads via WhatsApp/mensageria) com o
-investimento de mídia paga (**Meta Ads**) e com a lista de **Compradores**,
-calcula os **Leads Qualificados (MQLs)** e as **Vendas/Faturamento** atribuídos
-por anúncio, e é publicada no **GitHub Pages**. Reconstrói sozinha a cada
-~30 min, disparada pelo **cron-job.org** — sem depender de nenhum PC ligado.
+Dashboard **100% na nuvem** do funil **Família Aprovada · MTR-SET26**, cruzando a
+mídia paga (Meta Ads) com os leads capturados na landing page. Build estático
+(HTML/CSS/JS puro + Chart.js via CDN) publicado no **GitHub Pages** e reconstruído
+a cada ~30 min pelo GitHub Actions (disparado externamente pelo cron-job.org).
 
-**URL pública:** `https://<<PREENCHER: owner do GitHub>>.github.io/<<PREENCHER: nome do repositório>>/`
+**URL pública:** https://scale-ag.github.io/dash-familia-aprovada-mtr-set26/
 
----
-
-## O que ela mostra
-
-- **KPIs**: Gasto Total, Leads Totais, CPL, **MQLs** (critério do cliente), CPMQL, Tx-MQL, Impressões, Cliques, CTR, CPC, CPM.
-- **Evolução diária**: gasto/dia, leads × MQLs/dia, CPL × CPMQL/dia.
-- **Qualificação & origem**: leads por faixa/critério (qualificado destacado), por origem (mídia paga vs. orgânico), por profissão e por plataforma.
-- **Cruzamento por campanha**: gasto (mídia paga) × leads/MQLs (lista) → CPL, CPMQL e Tx-MQL calculados.
-- **Tabela de leads qualificados** (e-mail e telefone **mascarados**, pois a página é pública).
-- **Toggle de imposto da mídia paga** (opcional) e **modo claro/escuro**.
-- **Aba Relatório**: painel de metas editável + Top/Piores Anúncios + Insights de Tráfego (texto, preenchido manualmente ou por automação própria — ver `build/GUIA-RELATORIOS.md`).
-
-## Critério de Lead Qualificado (MQL)
-
-Coluna de qualificação do cliente (<<PREENCHER: nome da coluna de MQL, ex. "É médico?">>)
-== "Sim". Lógica em `build.py` → `is_medico` (renomeie/ajuste ao critério do cliente).
-
-## Fontes de dados (somente leitura)
-
-Planilha central `<<PREENCHER: nome da planilha central>>`
-(`<<PREENCHER: SPREADSHEET_ID>>`):
-
-| Aba | gid | Uso |
-|-----|-----|-----|
-| Conversas (fonte principal) | `<<PREENCHER: GID_CONVERSAS>>` | fonte **principal** de leads (webhook/mensageria) — usada em todos os gráficos/cards/tabelas |
-| Leads (legado) | `<<PREENCHER: GID_LEADS>>` | popup/form antigo — só contada (total), não entra em cálculo algum |
-| Meta Ads | `<<PREENCHER: GID_META>>` | gasto, impressões, cliques |
-| New Subscriptions (Compradores) | `<<PREENCHER: GID_SALES>>` | cruzada por telefone com a Conversas → Vendas/Faturamento por anúncio |
-
-O build lê essas abas via **export CSV público** (`.../export?format=csv&gid=...`).
-**Nada é escrito de volta** nas planilhas.
+Somente leitura das planilhas. O build **nunca** escreve de volta.
 
 ---
 
-## Arquitetura
+## O que a dash mostra
 
-```
-cron-job.org  ──(POST workflow_dispatch a cada 30 min)──▶  GitHub Actions
-                                                              │
-                          build/build.py  lê os CSVs ◀────────┘
-                                 │  cruza dados + calcula MQLs
-                                 ▼
-                          dist/index.html  ──▶  deploy  ──▶  GitHub Pages (URL pública)
-```
+Funil: **Gasto → Impressões → Cliques → Visitas na LP → Leads**, com CPM, CTR,
+CPC, CR, CPV, ConvLP e CPL. Três páginas:
 
-- `build/build.py` — baixa os CSVs, cruza os dados, gera `dist/index.html`.
-- `build/template.html` — layout/gráficos/tema (Chart.js via CDN).
-- `.github/workflows/deploy.yml` — roda o build e publica no Pages.
+1. **Visão Geral de Leads** — funil + KPIs secundários, evolução diária,
+   tabela diária com heatmap e 4 quebras (por anúncio, por posicionamento,
+   por conjunto e CPL por anúncio).
+2. **Captura Meta Ads** — mesmo funil + donut de conversão da LP, compilado de
+   anúncios por CPL, tabela diária e as 3 tabelas hierárquicas
+   (Campanha → Conjunto → Anúncio) com filtro cruzado bidirecional.
+3. **Relatório** — espelha a Visão Geral, mais o painel editável de metas e a
+   tabela de anúncios com status de amostra. O bloco "Insights de Tráfego"
+   aparece vazio até a Routine do Claude ser criada (ver abaixo).
 
-**Cache-bust:** a página usa `Cache-Control: no-cache`, mostra o horário do último
-build, tem botão **Atualizar** e se recarrega sozinha (`?t=timestamp`) ~30 min após
-aberta — sempre pegando a versão mais nova.
+### Regra de LEAD VÁLIDO
+Só entra na dashboard o lead que satisfaz **as três** condições
+(`build/build.py` → `is_valid_lead`):
 
-## Rodar localmente (opcional)
+1. `utm_source` == `Meta-Ads`;
+2. `utm_campaign` começa com `MTR-SET26`;
+3. `nome`, `email` e `telefone` preenchidos.
+
+Isso descarta os cadastros de teste e os leads diretos/orgânicos sem UTM.
+**Consequência:** 100% dos leads da dash são de mídia paga. O build imprime no
+log quantos leads foram descartados e por quê.
+
+### O que NÃO existe nesta conta
+Não há MQL/qualificação, compradores, vendas, faturamento, receita, CAC nem
+ROAS — não existe fonte de dados para nada disso, então nenhuma dessas métricas
+é calculada ou exibida. O Meta Ads desta conta também não expõe
+`Adds to Cart`/`Subscriptions` (sem Checkouts) nem permalink do criativo.
+
+### Imposto da mídia paga
+`TAX_FACTOR = 1.13806` (13,806%) em `build/build.py`, aplicado **somente** ao
+gasto do Meta Ads. O toggle "Imposto Meta" já vem ligado; desligá-lo mostra o
+gasto sem imposto.
+
+## Fontes de dados (Google Sheets, somente leitura)
+
+São **duas planilhas separadas**:
+
+| Planilha | ID | Aba (gid) | Colunas usadas |
+|---|---|---|---|
+| Leads (LP) | `11AzC3YayPbFx_jtKfHc566gwVAaR_2AtUnja_tdW4-s` | `0` | `data_inscricao` · `nome` · `email` · `telefone` · `utm_source` · `utm_campaign` · `utm_medium` · `utm_content` · `utm_term` |
+| Meta Ads | `1op35YxXrib70If3Ywo3iRHIZxdbLOYGxMkk3za1hVC0` | `0` | `Day` · `Campaign Name` · `Ad Set Name` · `Ad Name` · `Impressions` · `Link Clicks` · `Landing Page Views` · `Amount Spent` |
+
+O casamento entre as duas é **exato**, sem heurística:
+`utm_campaign` = `Campaign Name` · `utm_medium` = `Ad Set Name` · `utm_content` = `Ad Name`.
+
+A mesma planilha de Leads tem uma segunda aba (gid `1548896461`) com o
+questionário de aplicação. **Ela não é usada** — não há critério de MQL nesta
+dash.
+
+URL de export CSV: `https://docs.google.com/spreadsheets/d/<ID>/export?format=csv&gid=<GID>`
+
+## Rodar/testar local
 
 ```bash
-python build/build.py --out dist/index.html            # busca os CSVs ao vivo
-# ou, com arquivos locais para teste:
-python build/build.py --conversas-file conversas.csv --meta-file meta.csv \
-  --sales-file compradores.csv --leads-file leads.csv --out dist/index.html
+python build/build.py --leads-file leads.csv --meta-file meta.csv --out dist/index.html
 ```
 
----
+Sem `--leads-file`/`--meta-file` o script busca os CSVs públicos direto do
+Google Sheets — o runner do GitHub Actions alcança `docs.google.com`, a maioria
+dos sandboxes de agente não.
 
-## Ativação (uma vez) e cron-job.org
+## Automação
 
-O disparo por `workflow_dispatch` só funciona quando o workflow está na branch
-**`main`**. Veja **`SETUP-CRON.md`** para o passo a passo e os valores exatos
-(URL, headers e body, com marcadores a preencher) a colar no cron-job.org.
+- `.github/workflows/deploy.yml` — roda `build/build.py` e publica no Pages.
+  Dispara por `workflow_dispatch` (usado pelo cron-job.org a cada 30 min),
+  `schedule` de backup e `push` na `main`.
+- `.github/workflows/briefing.yml` — coleta os números do Relatório. **Com o
+  agendamento desligado**, porque a Routine do Claude que consome esse JSON
+  ainda não existe. Ver o comentário no topo do arquivo para ativar.
 
-> ⚠️ **Segurança:** nunca comite tokens no repositório. Gere um token
-> *fine-grained*, só com **Actions: read/write** neste repositório, e use-o
-> apenas no cron-job.org (ou em GitHub Secrets, se aplicável).
-
-## Como usar este template para um novo cliente
-
-Veja o **CHECKLIST DE NOVO CLIENTE** no topo de `CLAUDE.md` (ou `AGENTS.md`) e
-o passo a passo completo em `GUIA-REPLICACAO.md`.
+Valores exatos para o cron-job.org: **`SETUP-CRON.md`**.

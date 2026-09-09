@@ -73,46 +73,41 @@ os Insights.
 
 ## Contexto do funil
 
-**Funil de High Ticket (<<PREENCHER: nome do cliente>>)** — <<PREENCHER: descrição
-curta do cliente/oferta>>. Funil de captura via WhatsApp com venda 1:1 (comercial
-fecha por conversa/reunião, não carrinho direto): o anúncio no Meta Ads leva
-a uma página de captura com botão do WhatsApp; ao clicar, o lead chama no
-WhatsApp Business do cliente e o webhook de mensageria dispara na 1ª mensagem,
-que cai na aba **Conversas** (fonte principal de leads deste dashboard). O
-critério de qualificação (MQL) é <<PREENCHER: critério de MQL do cliente, ex.
-"o lead ser médico">> — se qualificado, segue a conversa com o comercial até a
-venda (registrada na aba de Compradores e cruzada de volta ao anúncio por telefone).
+**Captação de Leads — Núbia Oliveira (Família Aprovada · MTR-SET26).** Oferta de
+preparação para concursos públicos. O anúncio no Meta Ads leva a uma landing page
+(`https://familiaprovada.com/mtr/`); quem preenche o formulário vira **lead**, com
+as UTMs preservadas na planilha de Leads. O funil desta conta **termina no lead**.
 
 ```
-Impressões → Cliques/abertura do WhatsApp → Leads → MQLs → Vendas → Faturamento
+Gasto → Impressões → Cliques → Visitas na LP → Leads
 ```
 
-- **MQL** = coluna de qualificação (<<PREENCHER: nome da coluna de MQL>>) == "Sim" (ver `build.py` → `is_medico`).
-- **Agendamento** = o lead qualificado marcou horário de reunião com o comercial.
-- **Reunião Realizada** = a reunião de fato aconteceu (o lead compareceu). O
-  inverso disso é o **No‑Show** (agendou e não compareceu) — a métrica de alerta
-  mais importante entre Agendamento e Venda.
+- **Lead válido** = `utm_source` == `Meta-Ads` **e** `utm_campaign` começando com
+  `MTR-SET26` **e** nome/e-mail/telefone preenchidos (ver `build.py` →
+  `is_valid_lead`). Cadastros de teste e leads diretos/orgânicos sem UTM ficam de
+  fora. **Todo lead da dash é, por definição, de mídia paga** — não existe quebra
+  orgânico vs. pago.
+- **Visitas na LP** = `Landing Page Views` do Meta Ads.
+- O casamento com o gerenciador é exato: `utm_campaign`/`utm_medium`/`utm_content`
+  == `Campaign Name`/`Ad Set Name`/`Ad Name`. `utm_term` é o **posicionamento**
+  (Instagram Feed/Stories/Reels, Facebook Feed/Reels, Outros).
 
-> **Estado atual dos dados:** enquanto só houver mídia paga × Leads, o funil
-> vai até **MQL**. As etapas seguintes (Agendamentos, Reuniões Realizadas, Vendas,
-> Faturamento) e as métricas derivadas aparecem como “-” até chegar a lista do
-> comercial/vendas. Quando os campos `agendamentos`/`reunioes`/`vendas`/
-> `fat` forem somados por linha em `buildAgg/daily/totals` (`build/app.js`),
-> **toda a UI acende sozinha** (funil, tabelas, Top/Piores).
+> **NÃO EXISTE nesta conta** — e portanto nunca deve aparecer no texto dos
+> Insights: MQL/qualificação, agendamentos, reuniões, no-show, compradores,
+> vendas, faturamento, receita, ticket médio, CAC, ROAS e Checkouts. Não há fonte
+> de dados para nada disso. Se um número desses for citado, está inventado.
 
 ## Fórmulas fundamentais
 
-- **Tx MQL** = MQLs ÷ Leads · **CPMQL** = Investimento ÷ MQLs
-- **Tx Agendamento** = Agendamentos ÷ MQLs · **CPAG** = Investimento ÷ Agendamentos
-- **Tx NS** = No-Shows÷ Agendamentos · **CPNS** = Investimento ÷ No-Shows
-- **No‑Show** = 1 − (Reuniões Realizadas ÷ Agendamentos) · **CPRR** = Investimento ÷ Reuniões Realizadas
-- **Tx Venda** = Vendas ÷ Reuniões Realizadas · **CAC** = Investimento ÷ Vendas
-- **ROAS** = Faturamento ÷ Investimento · **Ticket** = Faturamento ÷ Vendas
-- Conversões acumuladas úteis: Lead→Agendamento, Lead→Reunião Realizada, Lead→Venda,
-  MQL→Reunião Realizada, MQL→Venda, Agendamento→Venda.
+- **CPM** = Investimento ÷ Impressões × 1000 · **CTR** = Cliques ÷ Impressões
+- **CPC** = Investimento ÷ Cliques
+- **CR** = Visitas na LP ÷ Cliques · **CPV** = Investimento ÷ Visitas na LP
+- **ConvLP** = Leads ÷ Visitas na LP · **ConvForm** = Leads ÷ Cliques
+- **CPL** = Investimento ÷ Leads
 
-Regra de ouro: **acumulativas somam** (impressões, cliques, leads, MQLs, gasto);
-**derivadas recalculam dos totais** (nunca some percentuais).
+O "Investimento" já vem com o imposto aplicado (`TAX_FACTOR = 1.13806`) quando o
+toggle "Imposto Meta" está ligado — que é o padrão da dash e o valor usado em
+`relatorios_dados.json`.
 
 ## Princípio de interpretação
 

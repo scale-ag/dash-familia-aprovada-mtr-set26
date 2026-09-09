@@ -1,55 +1,49 @@
-# AGENTS.md — TEMPLATE de dashboard de captura de leads (High Ticket)
+# AGENTS.md — Dash Captação de Leads · Núbia Oliveira (Família Aprovada MTR-SET26)
 
 > Contexto completo em **`CLAUDE.md`** (mesma pasta) — leia-o antes de mexer no
 > projeto. Este arquivo é um resumo para agentes/ferramentas que seguem a
 > convenção `AGENTS.md`.
 >
-> **Este é um TEMPLATE limpo.** Todos os valores do cliente estão como
-> `<<PREENCHER: descrição>>`.
+> Este repositório veio de um template genérico High Ticket, mas **já está
+> configurado** — não há marcadores a preencher.
 
-## ✅ CHECKLIST DE NOVO CLIENTE (fazer em ordem)
+## O essencial em 6 linhas
 
-1. **`build/build.py` — constantes do topo:** `SPREADSHEET_ID`, `GID_CONVERSAS`
-   (fonte principal), `GID_LEADS` (legado, só contado), `GID_META`, `GID_SALES`,
-   `CLIENT_NAME`, `MAIN_PRODUCT`, `MAIN_PRODUCT_PREFIX`, `TAX_FACTOR`.
-2. **`build/build.py` — critério de MQL:** ajustar `is_medico()` e os aliases da
-   coluna de qualificação em `process()` ao cabeçalho da aba Conversas do cliente.
-3. **`build/app.js`:** revisar os rótulos fixos `'MQLs (...)'` e o agrupamento de
-   "faixa"/especialidade (o critério de `build.py` não propaga sozinho a esses textos).
-4. **`build/template.html`:** preencher `<title>` e o logo (`logo-main`/`logo-sub`).
-5. **`build/identidade-visual.css`:** cores, se o cliente tiver identidade própria.
-6. **`README.md` / `CLAUDE.md` / `SETUP-CRON.md`:** owner/repo do GitHub, URL do
-   GitHub Pages, nome do cliente, planilha/gids.
-7. **`build/GUIA-RELATORIOS.md`:** preencher o "Contexto do funil".
-8. **GitHub Pages + Actions:** confirmar `build/` + `.github/workflows/deploy.yml`
-   na `main` (ativa `workflow_dispatch`); rodar o workflow uma vez.
-9. **cron-job.org:** seguir `SETUP-CRON.md` — token fine-grained novo (Actions:
-   read/write, só neste repo), nunca reaproveitar um token exposto em chat.
-10. **Insights de Tráfego (opcional):** `build/relatorios.json` e
-    `build/relatorios_dados.json` começam vazios (`{}`). Ativar: deixar `briefing.yml`
-    gerar os números + criar a **Routine do Claude** (`create_trigger` apontando para
-    este repo) que redige `relatorios.json` na `main`. **Não vem pronta** — recriar por cliente.
-11. **Testar local** com CSVs de amostra antes de publicar (3 páginas, tema
-    claro/escuro, multi-seleção).
+- **Repo:** `scale-ag/dash-familia-aprovada-mtr-set26` · **Pages:** https://scale-ag.github.io/dash-familia-aprovada-mtr-set26/
+- **Fontes:** duas planilhas Google (Leads da LP + Meta Ads), somente leitura. IDs/gids no topo de `build/build.py`.
+- **Funil:** `Gasto → Impressões → Cliques → Visitas na LP → Leads`. Termina no lead.
+- **Lead válido:** `utm_source=Meta-Ads` **e** campanha começando com `MTR-SET26` **e** nome/e-mail/telefone preenchidos (`is_valid_lead`).
+- **Não existe nesta conta:** MQL, compradores, vendas, faturamento, receita, CAC, ROAS, Checkouts, link do criativo. Não tente reintroduzir sem fonte de dados.
+- **Build:** `python build/build.py --leads-file leads.csv --meta-file meta.csv --out dist/index.html` (sem os flags, busca os CSVs públicos — precisa alcançar `docs.google.com`).
 
-> **Fora do escopo deste template:** não há Cloudflare Worker nem chamada paga à
-> API da Anthropic. A automação de Insights é uma Routine agendada do Claude Code
-> (item 10). Qualquer outra camada é desenvolvimento novo.
+## Onde mexer
 
-## Engine (não muda entre clientes)
-`build/template.html`, `build/app.js`, `build/estilos.css`,
-`.github/workflows/deploy.yml`, `.github/workflows/briefing.yml`,
-`build/relatorio_lib.py`, `build/coletar_dados_relatorio.py`,
-`build/gerar_relatorios.py`, `build/GUIA-INTERPRETACAO-METRICAS.md`,
-`GUIA-REPLICACAO.md` — tabelas, filtros, gráficos, heatmap, tema claro/escuro,
-coleta/redação dos Insights. Ver `GUIA-REPLICACAO.md` para os detalhes de
-implementação (filtro cruzado, engine de tabela, gráficos Chart.js).
+| Quero mudar… | Arquivo |
+|---|---|
+| IDs/gids das planilhas, regra de lead válido, imposto, limiares de amostra | `build/build.py` (constantes no topo + `is_valid_lead`) |
+| Só as cores (tema claro/escuro) | `build/identidade-visual.css` |
+| Layout/componentes | `build/estilos.css` |
+| KPIs, funil, tabelas, gráficos, filtro cruzado | `build/app.js` |
+| Título, logo, textos fixos da página | `build/template.html` |
+| Publicação | `.github/workflows/deploy.yml` · `SETUP-CRON.md` |
 
-> `template.html` e `app.js` são engine, mas carregam o nome do cliente em pontos
-> pontuais (título/logo e um comentário) — já marcados como `<<PREENCHER>>`.
+`build/build.py` **não agrega**: exporta as linhas cruas (`leads[]`/`meta[]`) e
+TODA a lógica (filtros de data, filtro cruzado, KPIs, tabelas, gráficos, heatmap,
+imposto) roda no navegador, em `app.js`. `render()` costura
+`template.html` + `identidade-visual.css` + `estilos.css` + `app.js` nos
+placeholders `__STYLES__`/`__APP_JS__`/`__DATA_JSON__`.
 
-## Específico do cliente (troca a cada replicação)
-`build/build.py`, `build/identidade-visual.css` (cores, se aplicável),
-`build/relatorios.json` + `build/relatorios_dados.json` (conteúdo — começam vazios),
-`build/GUIA-RELATORIOS.md` (contexto do funil), `README.md`, `CLAUDE.md`,
-`SETUP-CRON.md`.
+## Insights de Tráfego (aba Relatório) — inativos
+
+`build/relatorios.json` e `build/relatorios_dados.json` estão vazios (`{}`) e o
+`schedule` do `.github/workflows/briefing.yml` está **comentado**: a Routine do
+Claude que redige os Insights não foi criada para este cliente. Instruções para
+ativar no topo do `briefing.yml`. O `gerar_relatorios.py` do template foi
+removido (era todo baseado em MQL/CAC/ROAS).
+
+## Antes de publicar
+
+Testar local com CSVs de amostra: 3 páginas, tema claro/escuro, multi-seleção
+(Ctrl) nas tabelas hierárquicas, filtro cruzado e seletor de período.
+Ver `GUIA-REPLICACAO.md` para os detalhes de implementação (engine de tabela,
+filtro cruzado, gráficos Chart.js).

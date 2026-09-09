@@ -33,8 +33,8 @@ from relatorio_lib import (
 
 
 def daily_series(meta: list[dict], leads: list[dict], start, end, camp=None, adset=None, ad=None) -> list[dict]:
-    """Uma linha por dia (spend/leads/mqls + derivadas) — dá ao Claude a base
-    pra enxergar tendência (ex.: CPM subindo/Tx-MQL caindo N dias seguidos)."""
+    """Uma linha por dia (spend/leads + derivadas) — dá ao Claude a base
+    pra enxergar tendência (ex.: CPM subindo/ConvLP caindo N dias seguidos)."""
     out = []
     cur = start
     while cur <= end:
@@ -43,9 +43,10 @@ def daily_series(meta: list[dict], leads: list[dict], start, end, camp=None, ads
             out.append({
                 "d": cur.strftime("%Y-%m-%d"),
                 "spend": round(a["spend"], 2), "impr": a["impr"], "clicks": a["clicks"],
-                "leads": a["leads"], "mqls": a["mqls"],
-                "cpm": _r(a["cpm"]), "ctr": _r(a["ctr"], 4), "cpl": _r(a["cpl"]),
-                "txmql": _r(a["txmql"], 4), "cpmql": _r(a["cpmql"]),
+                "pv": a["pv"], "leads": a["leads"],
+                "cpm": _r(a["cpm"]), "ctr": _r(a["ctr"], 4), "cpc": _r(a["cpc"]),
+                "cr": _r(a["cr"], 4), "cpv": _r(a["cpv"]),
+                "convlp": _r(a["convlp"], 4), "cpl": _r(a["cpl"]),
             })
         cur += timedelta(days=1)
     return out
@@ -58,9 +59,10 @@ def _r(v, nd=2):
 def totais_dict(a: dict) -> dict:
     return {
         "spend": round(a["spend"], 2), "impr": a["impr"], "clicks": a["clicks"],
-        "leads": a["leads"], "mqls": a["mqls"],
-        "cpm": _r(a["cpm"]), "ctr": _r(a["ctr"], 4), "cpl": _r(a["cpl"]),
-        "convform": _r(a["convform"], 4), "txmql": _r(a["txmql"], 4), "cpmql": _r(a["cpmql"]),
+        "pv": a["pv"], "leads": a["leads"],
+        "cpm": _r(a["cpm"]), "ctr": _r(a["ctr"], 4), "cpc": _r(a["cpc"]),
+        "cr": _r(a["cr"], 4), "cpv": _r(a["cpv"]),
+        "convlp": _r(a["convlp"], 4), "cpl": _r(a["cpl"]), "convform": _r(a["convform"], 4),
     }
 
 
@@ -119,28 +121,27 @@ def consolidado_criativos(por_anuncio: list[dict]) -> list[dict]:
     for ad, occs in by_ad.items():
         spend = sum(o["spend"] for o in occs)
         leads = sum(o["leads"] for o in occs)
-        mqls = sum(o["mqls"] for o in occs)
         clicks = sum(o["clicks"] for o in occs)
         impr = sum(o["impr"] for o in occs)
-        occs_com_mql = [o for o in occs if o["mqls"]]
-        melhor = min(occs_com_mql, key=lambda o: o["cpmql"]) if occs_com_mql else None
-        pior = max(occs_com_mql, key=lambda o: o["cpmql"]) if occs_com_mql else None
+        pv = sum(o.get("pv") or 0 for o in occs)
+        occs_com_lead = [o for o in occs if o["leads"] and o["cpl"] is not None]
+        melhor = min(occs_com_lead, key=lambda o: o["cpl"]) if occs_com_lead else None
+        pior = max(occs_com_lead, key=lambda o: o["cpl"]) if occs_com_lead else None
         out.append({
             "anuncio": ad,
             "n_estruturas": len(occs),
             "estruturas": [{"campanha": o["campanha"], "conjunto": o["conjunto"]} for o in occs],
-            "spend": round(spend, 2), "impr": impr, "clicks": clicks, "leads": leads, "mqls": mqls,
+            "spend": round(spend, 2), "impr": impr, "clicks": clicks, "pv": pv, "leads": leads,
             "cpm": round(spend / impr * 1000, 2) if impr else None,
             "ctr": round(clicks / impr, 4) if impr else None,
+            "convlp": round(leads / pv, 4) if pv else None,
             "cpl": round(spend / leads, 2) if leads else None,
-            "txmql": round(mqls / leads, 4) if leads else None,
-            "cpmql": round(spend / mqls, 2) if mqls else None,
             "melhor_estrutura": (
-                {"campanha": melhor["campanha"], "conjunto": melhor["conjunto"], "cpmql": melhor["cpmql"]}
+                {"campanha": melhor["campanha"], "conjunto": melhor["conjunto"], "cpl": melhor["cpl"]}
                 if melhor else None
             ),
             "pior_estrutura": (
-                {"campanha": pior["campanha"], "conjunto": pior["conjunto"], "cpmql": pior["cpmql"]}
+                {"campanha": pior["campanha"], "conjunto": pior["conjunto"], "cpl": pior["cpl"]}
                 if pior and pior is not melhor else None
             ),
         })
@@ -156,11 +157,9 @@ def whatsapp_numeros(label: str, start, end, cur: dict, saude: dict) -> dict:
         "periodo_label": label,
         "periodo_range": f"{start.strftime('%d/%m/%Y')} a {end.strftime('%d/%m/%Y')}",
         "gasto": money(cur["spend"]), "cpm": money(cur["cpm"]), "ctr": pct(cur["ctr"]),
-        "connect_rate": "Não disponível", "conv_lp": "Não disponível",
+        "connect_rate": "Não disponível",
+        "visitas_lp": num(cur["pv"]), "cpv": money(cur["cpv"]), "conv_lp": pct(cur["convlp"]),
         "leads": num(cur["leads"]), "cpl": money(cur["cpl"]),
-        "mqls": num(cur["mqls"]), "cpa_cpmql": money(cur["cpmql"]),
-        "vendas": "Não disponível", "faturamento": "Não disponível",
-        "cac": "Não disponível", "roas": "Não disponível", "ticket_medio": "Não disponível",
         "saude_funil": (
             f"{saude['nota']:.1f}/10 — {saude['classificacao']}" + (" (provisória)" if saude["provisoria"] else "")
             if saude["nota"] is not None else "Nota provisória — dados insuficientes"
@@ -169,7 +168,7 @@ def whatsapp_numeros(label: str, start, end, cur: dict, saude: dict) -> dict:
 
 
 def periodo_payload(meta: list[dict], leads: list[dict], today, start, end, key, date_min, date_max,
-                     meta_cpmql, meta_cac, volume_min) -> dict:
+                     meta_cpl, volume_min) -> dict:
     cur = derived(agg(meta, leads, start, end))
     ref7 = derived(agg(meta, leads, today - timedelta(days=6), today))
     ref14 = derived(agg(meta, leads, today - timedelta(days=13), today))
@@ -178,14 +177,14 @@ def periodo_payload(meta: list[dict], leads: list[dict], today, start, end, key,
     p_start, p_end, metodo = previous_period(key, start, end, today, date_min, date_max)
     anterior = derived(agg(meta, leads, p_start, p_end)) if p_start else None
 
-    saude = funnel_health(cur, ref30, meta_cpmql, meta_cac, volume_min, [ref7, ref14, ref30])
+    saude = funnel_health(cur, ref30, meta_cpl, volume_min, [ref7, ref14, ref30])
     por_anuncio = breakdown(meta, leads, start, end, "ad")
 
     return {
         "range": {"start": start.strftime("%Y-%m-%d"), "end": end.strftime("%Y-%m-%d")},
         "totais": totais_dict(cur),
         # Série diária AGREGADA do período (não por estrutura) — só a base p/ o
-        # Claude ver tendência geral (CPM subindo / Tx-MQL caindo N dias). Limitada
+        # Claude ver tendência geral (CPM subindo / ConvLP caindo N dias). Limitada
         # aos últimos 60 dias com atividade p/ não inchar "todo período". A série
         # por campanha/conjunto/anúncio foi REMOVIDA de propósito: ela respondia por
         # ~75% do tamanho do arquivo (≈280k tokens) e ninguém a consome — o veredito
@@ -212,18 +211,14 @@ def periodo_payload(meta: list[dict], leads: list[dict], today, start, end, key,
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--conversas-file")
-    ap.add_argument("--meta-file")
-    ap.add_argument("--sales-file")
     ap.add_argument("--leads-file")
+    ap.add_argument("--meta-file")
     ap.add_argument("--out", default="build/relatorios_dados.json")
     args = ap.parse_args()
 
-    conversas_rows = bp.load_rows(bp.EXPORT_URL.format(sid=bp.SPREADSHEET_ID, gid=bp.GID_CONVERSAS), args.conversas_file)
-    meta_rows = bp.load_rows(bp.EXPORT_URL.format(sid=bp.SPREADSHEET_ID, gid=bp.GID_META), args.meta_file)
-    sales_rows = bp.load_rows(bp.EXPORT_URL.format(sid=bp.SPREADSHEET_ID, gid=bp.GID_SALES), args.sales_file)
-    leads_lp_rows = bp.load_rows(bp.EXPORT_URL.format(sid=bp.SPREADSHEET_ID, gid=bp.GID_LEADS), args.leads_file)
-    data = bp.process(conversas_rows, meta_rows, sales_rows, leads_lp_rows)
+    leads_rows = bp.load_rows(bp.EXPORT_URL.format(sid=bp.SPREADSHEET_ID_LEADS, gid=bp.GID_LEADS), args.leads_file)
+    meta_rows = bp.load_rows(bp.EXPORT_URL.format(sid=bp.SPREADSHEET_ID_META, gid=bp.GID_META), args.meta_file)
+    data = bp.process(leads_rows, meta_rows)
     leads, meta = data["leads"], data["meta"]
 
     now_brt = datetime.now(BRT)
@@ -242,9 +237,8 @@ def main():
         "params": {
             "tax_factor": bp.TAX_FACTOR,
             "sample_min_spend": bp.SAMPLE_MIN_SPEND,
-            "sample_min_mqls": bp.SAMPLE_MIN_MQLS,
-            "meta_cpmql": bp.META_CPMQL,
-            "meta_cac": bp.META_CAC,
+            "sample_min_leads": bp.SAMPLE_MIN_LEADS,
+            "meta_cpl": bp.META_CPL,
             "volume_min_amostral": bp.VOLUME_MIN_AMOSTRAL,
             "n_dias_corte": bp.N_DIAS_CORTE,
         },
@@ -252,7 +246,7 @@ def main():
     }
     for key, (start, end, label) in periods.items():
         payload = periodo_payload(meta, leads, today, start, end, key, date_min, date_max,
-                                   bp.META_CPMQL, bp.META_CAC, bp.VOLUME_MIN_AMOSTRAL)
+                                   bp.META_CPL, bp.VOLUME_MIN_AMOSTRAL)
         payload["whatsapp_numeros"]["periodo_label"] = label
         out["periodos"][key] = {"label": label, **payload}
 

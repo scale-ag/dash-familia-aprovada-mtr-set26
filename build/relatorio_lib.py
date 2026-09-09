@@ -89,20 +89,22 @@ def agg(meta: list[dict], leads: list[dict], start: date, end: date, camp: str |
     spend = sum(r["sp"] for r in m) * bp.TAX_FACTOR
     impr = sum(r["im"] for r in m)
     clicks = sum(r["cl"] for r in m)
+    pv = sum(r["pv"] for r in m)
     n_leads = len(l)
-    n_mqls = sum(r["q"] for r in l)
-    return {"spend": spend, "impr": impr, "clicks": clicks, "leads": n_leads, "mqls": n_mqls}
+    return {"spend": spend, "impr": impr, "clicks": clicks, "pv": pv, "leads": n_leads}
 
 
 def derived(a: dict) -> dict:
-    spend, impr, clicks, leads, mqls = a["spend"], a["impr"], a["clicks"], a["leads"], a["mqls"]
+    spend, impr, clicks, pv, leads = a["spend"], a["impr"], a["clicks"], a["pv"], a["leads"]
     return {
         "cpm": (spend / impr * 1000) if impr else None,
         "ctr": (clicks / impr) if impr else None,
+        "cpc": (spend / clicks) if clicks else None,
+        "cr": (pv / clicks) if clicks else None,
+        "cpv": (spend / pv) if pv else None,
+        "convlp": (leads / pv) if pv else None,
         "cpl": (spend / leads) if leads else None,
         "convform": (leads / clicks) if clicks else None,
-        "txmql": (mqls / leads) if leads else None,
-        "cpmql": (spend / mqls) if mqls else None,
         **a,
     }
 
@@ -153,7 +155,7 @@ def previous_period(key: str, start: date, end: date, today: date,
     return p_start, p_end, "período imediatamente anterior, mesma duração"
 
 
-RATE_METRICS = {"ctr", "convform", "txmql"}
+RATE_METRICS = {"ctr", "convform", "cr", "convlp"}
 MATERIAL_PCT = 0.10     # variação relativa mínima p/ considerar mudança relevante
 MATERIAL_PP = 0.03      # variação em pontos percentuais mínima p/ métricas de taxa
 
@@ -162,8 +164,8 @@ def compare(cur: dict, prev: dict | None) -> dict:
     """Compara duas agregações `derived()` métrica a métrica. Só marca
     `material=True` quando a variação passa os limiares mínimos — evita
     listar oscilações irrelevantes como se fossem alerta (regra §7)."""
-    metrics = ["spend", "impr", "clicks", "leads", "mqls", "cpm", "ctr", "cpl",
-               "convform", "txmql", "cpmql"]
+    metrics = ["spend", "impr", "clicks", "pv", "leads", "cpm", "ctr", "cpc",
+               "cr", "cpv", "convlp", "cpl", "convform"]
     out = {}
     for m in metrics:
         cv, pv = cur.get(m), (prev or {}).get(m)
@@ -174,7 +176,7 @@ def compare(cur: dict, prev: dict | None) -> dict:
             row["delta_pct"] = round((cv - pv) / pv, 4) if pv else None
             if m in RATE_METRICS:
                 row["delta_pp"] = round((cv - pv) * 100, 2)
-            higher_is_better = m not in ("spend", "cpm", "cpl", "cpmql")
+            higher_is_better = m not in ("spend", "cpm", "cpc", "cpv", "cpl")
             if abs(cv - pv) < 1e-9:
                 row["direcao"] = "estavel"
             else:
@@ -212,7 +214,7 @@ def _classificacao(nota: float) -> str:
     return "Crítico grave"
 
 
-def funnel_health(cur: dict, baseline: dict, meta_cpmql, meta_cac,
+def funnel_health(cur: dict, baseline: dict, meta_cpl,
                    volume_min: int, sample_windows: list[dict]) -> dict:
     """`cur` e `baseline` são dicts `derived()` do período atual e de uma
     janela de referência (normalmente 30d). `sample_windows` é uma lista de
@@ -228,36 +230,40 @@ def funnel_health(cur: dict, baseline: dict, meta_cpmql, meta_cac,
     else:
         sub["aquisicao"] = None
 
-    # Conversão da página: sem fonte de Page Views/ConvLP conectada ao dashboard.
-    sub["conversao_pagina"] = None
-
-    # Qualificação: TxMQL/CPMQL vs. meta (se definida) ou vs. baseline da conta.
-    if cur.get("cpmql") is not None:
-        ref = meta_cpmql if meta_cpmql is not None else baseline.get("cpmql")
-        if ref:
-            cpmql_var = (cur["cpmql"] - ref) / ref
-            sub["qualificacao"] = round(_clamp(10 - cpmql_var * 10), 1)
-        else:
-            sub["qualificacao"] = None
+    # Conversão da página: ConvLP (lead / visita na LP) vs. baseline da conta.
+    if cur.get("convlp") is not None and baseline.get("convlp"):
+        convlp_var = (cur["convlp"] - baseline["convlp"]) / baseline["convlp"]
+        sub["conversao_pagina"] = round(_clamp(10 + convlp_var * 10), 1)
     else:
-        sub["qualificacao"] = None
+        sub["conversao_pagina"] = None
 
-    # Vendas: sem fonte comercial (agendamentos/reuniões/vendas) conectada.
-    sub["vendas"] = None
+    # Custo do lead: CPL vs. meta (se definida) ou vs. baseline da conta.
+    if cur.get("cpl") is not None:
+        ref = meta_cpl if meta_cpl is not None else baseline.get("cpl")
+        if ref:
+            cpl_var = (cur["cpl"] - ref) / ref
+            sub["custo_lead"] = round(_clamp(10 - cpl_var * 10), 1)
+        else:
+            sub["custo_lead"] = None
+    else:
+        sub["custo_lead"] = None
 
-    # Consistência: quanto a Tx-MQL varia entre as janelas de amostra (7/14/30d)
+    # Qualificação e Vendas: esta conta não tem MQL nem fonte comercial
+    # (compradores/vendas) — ver build.py. Não entram na nota.
+
+    # Consistência: quanto a ConvLP varia entre as janelas de amostra (7/14/30d)
     # — baixa variação = leitura mais confiável entre janelas.
-    txmqls = [w["txmql"] for w in sample_windows if w.get("txmql") is not None]
-    if len(txmqls) >= 2 and max(txmqls) > 0:
-        spread = (max(txmqls) - min(txmqls)) / max(txmqls)
+    convs = [w["convlp"] for w in sample_windows if w.get("convlp") is not None]
+    if len(convs) >= 2 and max(convs) > 0:
+        spread = (max(convs) - min(convs)) / max(convs)
         sub["consistencia"] = round(_clamp(10 - spread * 10), 1)
     else:
         sub["consistencia"] = None
 
-    # Confiabilidade dos dados: volume de MQLs no período vs. volume mínimo
+    # Confiabilidade dos dados: volume de leads no período vs. volume mínimo
     # amostral configurado no painel da aba Relatório.
-    mqls = cur.get("mqls") or 0
-    sub["confiabilidade_dados"] = round(_clamp(10 * mqls / volume_min if volume_min else 10), 1)
+    leads = cur.get("leads") or 0
+    sub["confiabilidade_dados"] = round(_clamp(10 * leads / volume_min if volume_min else 10), 1)
 
     disponiveis = {k: v for k, v in sub.items() if v is not None}
     if not disponiveis:
