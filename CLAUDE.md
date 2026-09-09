@@ -208,7 +208,6 @@ filtro cruzado bidirecional; tabela diária com último dia no topo; heatmap de 
 fixa por métrica.
 
 ## Lacunas de dados
-- **Frequência** (impressões/alcance) → o export do Meta não traz alcance; aparece "-".
 - **Checkouts / VisCHK** → dependeriam de `Adds to Cart` no export do Meta; não existem.
 - **Link do criativo** → dependeria de uma coluna de permalink no export do Meta; não existe.
 - Etapas pós-lead (MQL, vendas, faturamento) → ver "O que NÃO existe nesta conta".

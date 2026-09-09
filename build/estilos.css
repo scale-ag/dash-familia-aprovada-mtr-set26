@@ -156,7 +156,6 @@
   .step .secs{display:flex; gap:12px; flex-wrap:nowrap; justify-content:flex-end; text-align:right; flex-shrink:0; margin-left:auto}
   .step .secs .s-label{font-size:10.5px; color:var(--muted); display:block; margin-bottom:3px}
   .step .secs .s-val{font-size:14px; font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap}
-  .na-tag{font-size:10.5px; color:var(--muted); border:1px dashed var(--border); border-radius:999px; padding:2px 8px}
 
   /* Tables */
   .table-chart-pair{background:var(--surface); border:1px solid var(--border); border-radius:14px; overflow:hidden; margin-top:16px}

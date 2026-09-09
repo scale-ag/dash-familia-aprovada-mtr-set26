@@ -911,10 +911,9 @@ function selDim(dim,key,ctrl){
 function renderMeta(){
   const F=metaScope(null), fL=F.fL, fM=F.fM;   // KPIs, funil, graficos e tabela diaria
   const t=totals(fL,fM), dv=derive(t), g=dv.gasto;
-  const NA='<span class="na-tag">sem dado</span>';
   const steps=[
     ['Gasto Total', brl(g), [], false, 'hl-gasto'],
-    ['Impressões', intf(t.im), [['CPM',brl(dv.cpm)],['Frequência',NA]]],
+    ['Impressões', intf(t.im), [['CPM',brl(dv.cpm)]]],
     ['Cliques', intf(t.cl), [['CTR',pct(dv.ctr)],['CPC',brl(dv.cpc)]]],
     ['Visitas na LP', intf(t.pv), [['CR',pct(dv.cr)],['CPV',brl(dv.cpv)]]],
     ['Leads', intf(t.leads), [['CPL',brl(dv.cpl)],['ConvLP',pct(dv.convlp)]], false, 'hl-lead'],
