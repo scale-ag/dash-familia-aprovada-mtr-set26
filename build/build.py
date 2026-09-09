@@ -75,7 +75,29 @@ MAIN_PRODUCT_PREFIX = "MTR-SET26"
 # utm_source exigido para o lead contar como mídia paga.
 LEAD_SOURCE_META = "meta-ads"
 
-BRT = timezone(timedelta(hours=-3))   # horario de Brasilia (exibicao)
+# --------------------------------------------------------------------------- #
+# Fusos horarios — a planilha de Leads e a conta de anuncios NAO estao no mesmo
+# fuso, e isso desloca o dia de parte dos leads:
+#   - data_inscricao (planilha de Leads) e' gravada em America/Sao_Paulo (UTC-3);
+#   - o campo "Day" do Meta Ads e' o dia fechado no fuso da CONTA DE ANUNCIOS,
+#     que aqui e' America/Noronha (UTC-2).
+# Como Noronha esta 1h A FRENTE, todo lead das 23:00-23:59 em Sao Paulo ja e' do
+# DIA SEGUINTE para o Meta. Sem converter, esses leads caem num dia e o gasto que
+# os gerou no outro, estragando CPL/ConvLP diarios. parse_lead_date() faz a
+# conversao; o "Day" do Meta entra como esta (ja e' o fuso de referencia).
+# O Brasil nao tem mais horario de verao (extinto em 2019), entao os dois fusos
+# sao offsets fixos — o fallback abaixo e' exato, nao uma aproximacao.
+LEADS_TZ_NAME = "America/Sao_Paulo"    # fuso em que a planilha de Leads grava a hora
+ACCOUNT_TZ_NAME = "America/Noronha"    # fuso da conta de anuncios (dia de referencia da dash)
+try:                                    # tzdata do sistema (runner do Actions tem)
+    from zoneinfo import ZoneInfo
+    LEADS_TZ = ZoneInfo(LEADS_TZ_NAME)
+    ACCOUNT_TZ = ZoneInfo(ACCOUNT_TZ_NAME)
+except Exception:                       # sem tz database: offsets fixos equivalentes
+    LEADS_TZ = timezone(timedelta(hours=-3))
+    ACCOUNT_TZ = timezone(timedelta(hours=-2))
+
+BRT = timezone(timedelta(hours=-3))   # horario de Brasilia (so p/ o carimbo "ultima atualizacao")
 TAX_FACTOR = 1.13806   # fator padrão de imposto/taxa sobre o gasto de mídia paga (Meta Ads) = 13,806%.
                        # Default do template para toda nova dash criada a partir dele; ajuste apenas
                        # se o cliente tiver um fator diferente, ou use 1.0 se não houver imposto.
@@ -163,8 +185,9 @@ def to_float(v) -> float:
 
 
 def parse_date(v: str) -> str | None:
-    """Aceita "2026-09-08" (Meta Ads) e "08/09/2026 15:15" (data_inscricao da LP).
-    A hora, quando existe, e' descartada — a dash agrega por DIA."""
+    """Dia SEM conversao de fuso — usado no "Day" do Meta Ads, que ja vem fechado
+    no fuso da conta (o fuso de referencia da dash). Para os leads use
+    parse_lead_date(), que converte de Sao Paulo para o fuso da conta."""
     if not v:
         return None
     s = str(v).strip()
@@ -192,6 +215,37 @@ def parse_date(v: str) -> str | None:
 # letras.
 _TEST_NAME_RE = re.compile(r"^(teste?\d*)(\s+teste?\d*)*$")
 _TEST_EMAIL_DOMAINS = ("teste.com", "test.com", "example.com")
+
+
+# Formatos aceitos em data_inscricao, com e sem hora.
+_LEAD_DT_FORMATS = (
+    "%d/%m/%Y %H:%M:%S", "%d/%m/%Y %H:%M", "%d/%m/%Y",
+    "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d",
+    "%d/%m/%y %H:%M:%S", "%d/%m/%y %H:%M", "%d/%m/%y",
+)
+
+
+def parse_lead_date(v: str) -> str | None:
+    """Dia do lead JA CONVERTIDO para o fuso da conta de anuncios.
+
+    data_inscricao vem em America/Sao_Paulo (UTC-3) e o dia do Meta Ads e' fechado
+    em America/Noronha (UTC-2), 1h a frente: um lead de 08/09 23:30 em Sao Paulo e'
+    09/09 00:30 para o Meta e precisa contar no dia 09. Sem hora na celula, assume
+    00:00 (o dia nao muda). Devolve "YYYY-MM-DD" no fuso da conta."""
+    if not v:
+        return None
+    s = str(v).strip()
+    if not s:
+        return None
+    s = re.sub(r"\s+", " ", s)
+    for fmt in _LEAD_DT_FORMATS:
+        try:
+            dt = datetime.strptime(s, fmt)
+        except ValueError:
+            continue
+        return dt.replace(tzinfo=LEADS_TZ).astimezone(ACCOUNT_TZ).strftime("%Y-%m-%d")
+    # formato desconhecido: cai no parser generico (sem conversao de fuso)
+    return parse_date(s)
 
 
 def is_test_lead(name: str, email: str) -> bool:
@@ -322,7 +376,7 @@ def process(leads_rows, meta_rows):
                 descartados["teste"] += 1
             continue
         leads.append({
-            "d": parse_date(cell(row, lidx["created"])),
+            "d": parse_lead_date(cell(row, lidx["created"])),
             # Todo lead que chega aqui é, por definição, de mídia paga.
             "src": "meta",
             "plat": pretty_placement(cell(row, lidx["placement"])),
@@ -361,15 +415,18 @@ def process(leads_rows, meta_rows):
         })
 
     dates = sorted({d for d in ([l["d"] for l in leads if l["d"]] + [m["d"] for m in meta if m["d"]])})
-    now_brt = datetime.now(BRT)
+    now_brt = datetime.now(BRT)              # carimbo "ultima atualizacao" (hora local do gestor)
+    hoje_conta = datetime.now(ACCOUNT_TZ)    # "hoje" do funil = dia no fuso da conta de anuncios
     return {
         "build": {
             "generated_at_brt": now_brt.strftime("%d/%m/%Y %H:%M"),
             "build_id": datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S"),
-            "today": now_brt.strftime("%Y-%m-%d"),
+            "today": hoje_conta.strftime("%Y-%m-%d"),
             "date_min": dates[0] if dates else None,
             "date_max": dates[-1] if dates else None,
             "tax_factor": TAX_FACTOR,
+            "leads_tz": LEADS_TZ_NAME,
+            "account_tz": ACCOUNT_TZ_NAME,
             "client_name": CLIENT_NAME,
             "main_product": MAIN_PRODUCT,
             # config da aba Relatório (lida pelo front)

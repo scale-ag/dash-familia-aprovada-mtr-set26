@@ -88,6 +88,9 @@ Gasto → Impressões → Cliques → Visitas na LP → Leads
   fora. **Todo lead da dash é, por definição, de mídia paga** — não existe quebra
   orgânico vs. pago.
 - **Visitas na LP** = `Landing Page Views` do Meta Ads.
+- **Dias** seguem o fuso da conta de anúncios (America/Noronha). A hora do lead é
+  convertida de America/Sao_Paulo, então lead a partir das 23h (SP) conta no dia
+  seguinte — é o que faz o CPL diário bater com o gasto do Meta.
 - O casamento com o gerenciador é exato: `utm_campaign`/`utm_medium`/`utm_content`
   == `Campaign Name`/`Ad Set Name`/`Ad Name`. `utm_term` é o **posicionamento**
   (Instagram Feed/Stories/Reels, Facebook Feed/Reels, Outros).

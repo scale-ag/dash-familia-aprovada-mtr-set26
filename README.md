@@ -44,6 +44,13 @@ ROAS — não existe fonte de dados para nada disso, então nenhuma dessas métr
 é calculada ou exibida. O Meta Ads desta conta também não expõe
 `Adds to Cart`/`Subscriptions` (sem Checkouts) nem permalink do criativo.
 
+### Fuso horário
+`data_inscricao` vem em **America/Sao_Paulo** (UTC−3) e o `Day` do Meta Ads é
+fechado em **America/Noronha** (UTC−2), fuso da conta de anúncios. O build
+converte a hora do lead antes de decidir o dia (`build.py` → `parse_lead_date`),
+então **lead a partir das 23h em São Paulo conta no dia seguinte** — alinhado com
+o Meta. O `Day` do Meta entra sem conversão.
+
 ### Imposto da mídia paga
 `TAX_FACTOR = 1.13806` (13,806%) em `build/build.py`, aplicado **somente** ao
 gasto do Meta Ads. O toggle "Imposto Meta" já vem ligado; desligá-lo mostra o

@@ -27,7 +27,7 @@ from datetime import datetime, timedelta
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build as bp  # reaproveita fetch/parse/process/constantes de build.py
 from relatorio_lib import (
-    BRT, d, build_periods, in_range, agg, derived, shift_back,
+    BRT, ACCOUNT_TZ, d, build_periods, in_range, agg, derived, shift_back,
     previous_period, compare, funnel_health, money, pct, num,
 )
 
@@ -221,8 +221,11 @@ def main():
     data = bp.process(leads_rows, meta_rows)
     leads, meta = data["leads"], data["meta"]
 
-    now_brt = datetime.now(BRT)
-    today = now_brt.date()
+    now_brt = datetime.now(BRT)                  # carimbo de geração (hora do gestor)
+    # As janelas de período têm de fechar no MESMO fuso em que os dias da dash
+    # são contados (o da conta de anúncios), senão "hoje"/"ontem" pegariam um
+    # recorte diferente do que o site mostra — ver build.py::parse_lead_date.
+    today = datetime.now(ACCOUNT_TZ).date()
     date_min = d(data["build"]["date_min"]) if data["build"]["date_min"] else None
     date_max = d(data["build"]["date_max"]) if data["build"]["date_max"] else None
 

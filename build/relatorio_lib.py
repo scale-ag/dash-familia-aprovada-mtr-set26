@@ -13,7 +13,8 @@ from datetime import datetime, timedelta, date
 
 import build as bp
 
-BRT = bp.BRT
+BRT = bp.BRT                 # hora local do gestor (só p/ carimbo de geração)
+ACCOUNT_TZ = bp.ACCOUNT_TZ   # fuso da conta de anúncios = fuso dos dias da dash
 
 
 def d(s: str) -> date:

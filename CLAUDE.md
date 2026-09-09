@@ -86,6 +86,22 @@ sigla       etapa    público     obj.   estrutura
 - **Sigla do funil: `MTR-SET26`** (`MAIN_PRODUCT_PREFIX`) — só existe uma nesta conta.
 - `E2-CAP` = etapa 2 / captação · `P1-QUENTE` = público quente · `LEAD` = objetivo · `ABO`.
 
+### Fuso horário (crítico para o CPL diário)
+A planilha de Leads grava `data_inscricao` em **America/Sao_Paulo** (UTC−3), mas o
+campo `Day` do Meta Ads é o dia fechado no fuso da **conta de anúncios**, que é
+**America/Noronha** (UTC−2) — 1h à frente. `build.py` → `parse_lead_date()`
+converte a hora do lead de São Paulo para o fuso da conta antes de decidir o dia;
+o `Day` do Meta entra sem conversão (já é o fuso de referência). Consequência
+prática: **lead cadastrado a partir das 23h em São Paulo conta no dia seguinte**,
+igual ao Meta. Sem isso, o lead caía num dia e o gasto que o gerou no outro,
+distorcendo CPL e ConvLP diários (o total do período nunca mudava).
+
+Constantes: `LEADS_TZ_NAME`/`ACCOUNT_TZ_NAME` em `build.py`. Usa `zoneinfo` e cai
+para offsets fixos (−3/−2) se não houver tz database — exato, porque o Brasil não
+tem mais horário de verão. O `today` do seletor de período e as janelas do
+`coletar_dados_relatorio.py` também usam o fuso da conta; só o carimbo
+"última atualização" fica na hora local do gestor (BRT).
+
 ### Imposto da mídia paga
 `TAX_FACTOR = 1.13806` (13,806%) em `build.py`, aplicado **somente** ao gasto do
 Meta Ads. O toggle "Imposto Meta" fica **ativo por padrão** (`STATE.tax=true` em
