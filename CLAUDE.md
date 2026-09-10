@@ -86,6 +86,30 @@ sigla       etapa    público     obj.   estrutura
 - **Sigla do funil: `MTR-SET26`** (`MAIN_PRODUCT_PREFIX`) — só existe uma nesta conta.
 - `E2-CAP` = etapa 2 / captação · `P1-QUENTE` = público quente · `LEAD` = objetivo · `ABO`.
 
+### Veiculação do anúncio (Ativo/Pausado)
+Coluna **Veiculação** nas 3 tabelas hierárquicas e na tabela de anúncios do
+Relatório, mais o KPI "Anúncios veiculando" na Visão Geral. Funciona em dois modos:
+
+1. **Status real** — se o export do Meta trouxer uma coluna de veiculação
+   (`Ad Delivery`, `Delivery`, `Veiculação`, `Status`, `Effective Status`,
+   `Entrega`), `build.py` a lê e emite `DATA.ad_status` (anúncio → status do dia
+   mais recente). `app.js` → `statusRank()` normaliza PT/EN para
+   **Ativo** (verde) · **Pausado** (vermelho) · qualquer outro estado do Meta
+   exibido como veio (amarelo).
+2. **Inferido pelo gasto** — enquanto a coluna não existir (**é o caso hoje**),
+   `app.js` → `deliveryCell()` usa o último dia COM GASTO de cada anúncio:
+   **Veiculando** = gastou no último dia do período · **Sem entrega** = já gastou
+   antes, mas não no último dia · **Sem gasto** = nada no período.
+
+Os rótulos são diferentes de propósito: "Veiculando/Sem entrega" deixa claro que
+é entrega observada, não o botão do gerenciador. Campanha e conjunto sempre usam
+o modo inferido (a coluna de status é por anúncio). Para ligar o modo real basta
+adicionar a coluna no export — **nenhuma mudança de código**.
+
+A coluna é `type:'html'` (chip colorido) com `sortKey:'_veic'`, um rank numérico
+paralelo — sem isso o clique no cabeçalho não ordenaria. `sortKey` é uma extensão
+da engine de tabela, disponível para qualquer coluna HTML futura.
+
 ### Fuso horário (crítico para o CPL diário)
 A planilha de Leads grava `data_inscricao` em **America/Sao_Paulo** (UTC−3), mas o
 campo `Day` do Meta Ads é o dia fechado no fuso da **conta de anúncios**, que é
@@ -226,6 +250,9 @@ fixa por métrica.
 ## Lacunas de dados
 - **Checkouts / VisCHK** → dependeriam de `Adds to Cart` no export do Meta; não existem.
 - **Link do criativo** → dependeria de uma coluna de permalink no export do Meta; não existe.
+- **Status real do anúncio (Ativo/Pausado)** → dependeria de uma coluna de
+  `Delivery`/`Veiculação` no export do Meta; não existe. A dash mostra a
+  veiculação inferida pelo gasto até a coluna aparecer (ver acima).
 - Etapas pós-lead (MQL, vendas, faturamento) → ver "O que NÃO existe nesta conta".
 
 ## Publicação — problemas conhecidos

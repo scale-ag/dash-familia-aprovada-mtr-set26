@@ -395,14 +395,32 @@ def process(leads_rows, meta_rows):
          "adset": ["ad set name", "adset"], "ad": ["ad name"],
          "spent": ["amount spent", "valor gasto", "gasto"], "impr": ["impressions", "impress"],
          "clicks": ["link clicks", "clicks", "cliques"],
-         "pv": ["landing page views", "page views", "pageviews"]},
+         "pv": ["landing page views", "page views", "pageviews"],
+         # Coluna OPCIONAL de veiculação do anúncio ("Delivery" no Meta, ou
+         # "Veiculação" no export em português). Hoje ela NÃO existe neste
+         # export — enquanto não existir, ad_status fica vazio e a dash mostra a
+         # veiculação INFERIDA pelo gasto (ver app.js::deliveryOf). Basta o
+         # cliente adicionar a coluna que o status real passa a valer, sem
+         # precisar mexer no código.
+         "status": ["ad delivery", "delivery", "veiculacao", "ad status",
+                    "effective status", "status", "entrega"]},
         {"day": 0, "campaign": 1, "adset": 2, "ad": 3, "impr": 4, "clicks": 5, "pv": 6, "spent": 7},
     )
 
     meta = []
+    # Anúncio -> status REAL de veiculação, quando a coluna existir. Guarda o
+    # valor do dia MAIS RECENTE em que o anúncio aparece (o status de ontem não
+    # deve sobrescrever o de hoje).
+    ad_status: dict[str, tuple[str, str]] = {}   # ad -> (dia, status)
     for row in meta_rows[1:]:
         if not any((c or "").strip() for c in row):
             continue
+        st = cell(row, midx["status"])
+        if st:
+            ad_nm = cell(row, midx["ad"]) or "(sem anúncio)"
+            dia = parse_date(cell(row, midx["day"])) or ""
+            if ad_nm not in ad_status or dia >= ad_status[ad_nm][0]:
+                ad_status[ad_nm] = (dia, st)
         meta.append({
             "d": parse_date(cell(row, midx["day"])),
             "camp": cell(row, midx["campaign"]) or "(sem campanha)",
@@ -442,6 +460,9 @@ def process(leads_rows, meta_rows):
         },
         "leads": leads,
         "meta": meta,
+        # Anúncio -> status real de veiculação vindo da planilha. Vazio enquanto
+        # não houver coluna de Delivery/Veiculação no export do Meta.
+        "ad_status": {ad: st for ad, (_, st) in ad_status.items()},
         # Insights de Tráfego (texto pré-escrito, lido de relatorios.json). Preenchido
         # em main() via load_briefings(); fica {} se relatorios.json não existir.
         "briefings": {},
@@ -528,6 +549,12 @@ def main():
           f"{d['teste']} de teste", file=sys.stderr)
     print(f"  meta      : {len(data['meta'])} linhas · gasto R$ {sp:,.2f} "
           f"(sem imposto; fator {TAX_FACTOR})", file=sys.stderr)
+    ns = len(data["ad_status"])
+    if ns:
+        veic = f"coluna de status encontrada — {ns} anúncio(s) com status real"
+    else:
+        veic = "sem coluna de status no export; a dash infere a veiculação pelo gasto"
+    print(f"  veiculação: {veic}", file=sys.stderr)
     print(f"  out       : {args.out}", file=sys.stderr)
 
 

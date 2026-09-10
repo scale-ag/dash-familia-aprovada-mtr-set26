@@ -44,6 +44,13 @@ ROAS — não existe fonte de dados para nada disso, então nenhuma dessas métr
 é calculada ou exibida. O Meta Ads desta conta também não expõe
 `Adds to Cart`/`Subscriptions` (sem Checkouts) nem permalink do criativo.
 
+### Veiculação do anúncio
+A coluna **Veiculação** mostra o status real do gerenciador **se** o export do
+Meta tiver uma coluna de `Delivery`/`Veiculação` — hoje ele **não tem**, então a
+dash infere pelo gasto: *Veiculando* (gastou no último dia do período),
+*Sem entrega* (gastou antes, não no último dia) e *Sem gasto*. Para ter o status
+real, adicione a coluna no export; o build a reconhece sozinho.
+
 ### Fuso horário
 `data_inscricao` vem em **America/Sao_Paulo** (UTC−3) e o `Day` do Meta Ads é
 fechado em **America/Noronha** (UTC−2), fuso da conta de anúncios. O build
