@@ -95,11 +95,17 @@ Relatório, mais o KPI "Anúncios veiculando" na Visão Geral. Funciona em dois 
    `Entrega`), `build.py` a lê e emite `DATA.ad_status` (anúncio → status do dia
    mais recente). `app.js` → `statusRank()` normaliza PT/EN para
    **Ativo** (verde) · **Pausado** (vermelho) · qualquer outro estado do Meta
-   exibido como veio (amarelo).
+   exibido como veio, também em vermelho.
 2. **Inferido pelo gasto** — enquanto a coluna não existir (**é o caso hoje**),
    `app.js` → `deliveryCell()` usa o último dia COM GASTO de cada anúncio:
    **Veiculando** = gastou no último dia do período · **Sem entrega** = já gastou
    antes, mas não no último dia · **Sem gasto** = nada no período.
+
+A leitura da coluna é **binária por decisão do cliente**: só verde (entregando) e
+vermelho (não entregando) — sem faixa amarela. O rank numérico (`_veic`) mantém
+os 3 níveis para a ordenação continuar separando "Sem entrega" de "Sem gasto".
+Isso vale só para a Veiculação; o amarelo continua nas outras escalas (CPL vs
+meta e badge "Em observação"), que são de atenção, não de status.
 
 Os rótulos são diferentes de propósito: "Veiculando/Sem entrega" deixa claro que
 é entrega observada, não o botão do gerenciador. Campanha e conjunto sempre usam

@@ -552,13 +552,16 @@ function cplByDimChart(id, fL, fM, agg, dim, selSet){
    Pausado", que só aparecem quando o status real existe. */
 const AD_STATUS = DATA.ad_status || {};
 const TEM_STATUS_REAL = Object.keys(AD_STATUS).length > 0;
-/* normaliza o texto do gerenciador (PT ou EN) para um dos 3 estados */
+/* normaliza o texto do gerenciador (PT ou EN). A leitura é BINÁRIA por decisão
+   do cliente: verde = entregando, vermelho = não entregando. Qualquer estado que
+   não seja explicitamente ativo é vermelho, mas o rótulo original do Meta é
+   preservado para não esconder a informação. */
 function statusRank(txt){
   const t=norm(txt);
   if(!t) return null;
   if(/(^|\b)(active|ativo|ativa|veiculando|em veiculacao|em veiculação)/.test(t)) return {rank:2,cls:'c-green',label:'Ativo'};
   if(/(paus|inactive|inativo|desativ|off|encerrad|arquivad|deleted|excluid)/.test(t)) return {rank:1,cls:'c-red',label:'Pausado'};
-  return {rank:0,cls:'c-yellow',label:String(txt).trim()};   // qualquer outro estado do Meta, exibido como veio
+  return {rank:0,cls:'c-red',label:String(txt).trim()};   // qualquer outro estado do Meta, exibido como veio
 }
 /* último dia COM GASTO de cada membro da dimensão, e o do período inteiro */
 function deliveryIndex(fM, dim){
@@ -577,7 +580,7 @@ function deliveryCell(key, idx, dim){
   const d=idx.last[key];
   if(!d) return {html:'<span class="rel-chip c-red">Sem gasto</span>', rank:0};
   if(d===idx.lastAll) return {html:'<span class="rel-chip c-green">Veiculando</span>', rank:2};
-  return {html:`<span class="rel-chip c-yellow">Sem entrega</span>`, rank:1, title:'último gasto em '+brdate(d)};
+  return {html:`<span class="rel-chip c-red" title="último gasto em ${brdate(d)}">Sem entrega</span>`, rank:1};
 }
 
 /* ---------------- KPI cards ---------------- */
