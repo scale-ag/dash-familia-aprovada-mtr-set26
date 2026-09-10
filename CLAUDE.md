@@ -86,46 +86,21 @@ sigla       etapa    público     obj.   estrutura
 - **Sigla do funil: `MTR-SET26`** (`MAIN_PRODUCT_PREFIX`) — só existe uma nesta conta.
 - `E2-CAP` = etapa 2 / captação · `P1-QUENTE` = público quente · `LEAD` = objetivo · `ABO`.
 
-### Veiculação (campanha, conjunto e anúncio)
-Coluna **Veiculação** em TODAS as listas de dimensão (3 tabelas hierárquicas,
-Compilado dos Anúncios e tabela de anúncios do Relatório) + KPI "Anúncios ativos".
-Leitura binária: **Ativo** (verde) ou **Pausado** (vermelho). Resolvida em 3
-degraus, nesta ordem (`app.js` → `deliveryCell`):
+### Veiculação / status do anúncio — REMOVIDO de propósito
+A dash **não mostra** status de veiculação (Ativo/Pausado) em nenhum nível.
+Chegou a existir e foi retirada a pedido do cliente, porque o export do Meta
+desta conta **não traz coluna de `Delivery`/`Veiculação`** e, sem ela, o único
+sinal disponível é o gasto — que tem granularidade **diária** e por isso **não
+enxerga um anúncio pausado no dia corrente**: ele já gastou de manhã antes de ser
+pausado e continuaria aparecendo como Ativo até o dia virar. Mostrar isso é pior
+do que não mostrar nada.
 
-1. **Status real do próprio nível** — `DATA.status.{ad,adset,camp}`, alimentado
-   por colunas OPCIONAIS do export (`Ad Delivery`/`Veiculação` para anúncio,
-   `Ad Set Delivery` para conjunto, `Campaign Delivery` para campanha).
-2. **Dedução a partir dos anúncios** — conjunto/campanha sem coluna própria ficam
-   **Ativo se pelo menos UM anúncio dentro estiver ativo**, que é o comportamento
-   do gerenciador. Ou seja: basta adicionar a coluna no nível do ANÚNCIO para os
-   três níveis ficarem corretos.
-3. **Inferência pelo gasto** — só quando não há status nenhum (**é o caso hoje**):
-   Ativo se gastou no último dia com gasto do período.
-
-> **Limite conhecido e importante da inferência:** ela **não enxerga um anúncio
-> pausado no dia corrente**. Se o anúncio gastou de manhã e foi pausado à tarde,
-> ele continua "Ativo" até o dia virar, porque a planilha tem granularidade
-> DIÁRIA, não horária. Nenhuma heurística sobre gasto diário resolve isso — só a
-> coluna de status resolve. O tooltip do chip diz quando o valor é inferido.
-
-`statusRank()` classifica o texto do gerenciador (PT/EN) e testa os estados de
-NÃO entrega ANTES dos de entrega, porque vários se sobrepõem
-("não está em veiculação" contém "em veiculação"). Estados de entrega incluem as
-variações de **aprendizado** ("Em aprendizado", "Aprendizado limitado",
-"Learning limited"), que ENTREGAM. Usa `normSt()`, com remoção de acentos própria
-— o `norm()` geral do `app.js` não remove acentos e o export em português vem
-acentuado. Há um teste de 26 estados reais do gerenciador.
-
-**`deliveryIndex(rowsM, dim, globalM)` recebe dois escopos, e isso importa:**
-- `rowsM` = o MESMO escopo que gerou as linhas (`Sc`/`Sa`/`Sd`, que excluem o
-  filtro da própria dimensão). Passar o escopo totalmente filtrado (`fM`) faz a
-  coluna contradizer o Gasto da mesma linha — foi um bug real.
-- `globalM` = `metaActive()` (período inteiro), só para o "último dia com gasto"
-  de referência, para selecionar uma linha nunca alterar o status das OUTRAS.
-  Também é dele que sai o mapa conjunto/campanha → anúncios do degrau 2.
-
-A coluna é `type:'html'` com `sortKey:'_veic'` (rank numérico paralelo), extensão
-da engine de tabela sem a qual o clique no cabeçalho seria um no-op.
+**Para trazer de volta:** a implementação completa (status real nos 3 níveis,
+dedução conjunto/campanha a partir dos anúncios, classificador `statusRank` com
+teste de 26 estados do gerenciador, coluna em todas as tabelas, `sortKey` na
+engine) está no commit `e5bd4d2` — é `git revert` do commit de remoção, não
+reescrita. Só faz sentido **depois** que a coluna **Veiculação** existir no
+export do Meta, no nível do ANÚNCIO (os outros dois níveis são deduzidos dela).
 
 ### Fuso horário (crítico para o CPL diário)
 A planilha de Leads grava `data_inscricao` em **America/Sao_Paulo** (UTC−3), mas o
@@ -267,10 +242,9 @@ fixa por métrica.
 ## Lacunas de dados
 - **Checkouts / VisCHK** → dependeriam de `Adds to Cart` no export do Meta; não existem.
 - **Link do criativo** → dependeria de uma coluna de permalink no export do Meta; não existe.
-- **Status real de veiculação** → dependeria de uma coluna de
-  `Delivery`/`Veiculação` no export do Meta; não existe. Até ela aparecer, a dash
-  infere pelo gasto e **não detecta pausa feita no dia corrente** (ver acima).
-  Adicionar a coluna no nível do ANÚNCIO já corrige os três níveis.
+- **Status de veiculação (Ativo/Pausado)** → dependeria de uma coluna de
+  `Delivery`/`Veiculação` no export do Meta; não existe, e por isso a coluna foi
+  removida da dash (ver acima).
 - Etapas pós-lead (MQL, vendas, faturamento) → ver "O que NÃO existe nesta conta".
 
 ## Publicação — problemas conhecidos

@@ -44,17 +44,12 @@ ROAS — não existe fonte de dados para nada disso, então nenhuma dessas métr
 é calculada ou exibida. O Meta Ads desta conta também não expõe
 `Adds to Cart`/`Subscriptions` (sem Checkouts) nem permalink do criativo.
 
-### Veiculação do anúncio
-A coluna **Veiculação** aparece em todas as listas de campanha, conjunto e
-anúncio. Mostra o status real do gerenciador **se** o export do Meta tiver uma
-coluna de `Delivery`/`Veiculação` — hoje ele **não tem**, então a dash infere
-pelo gasto do último dia. A leitura é binária: **Ativo** (verde) ou **Pausado**
-(vermelho); o motivo fica no tooltip do chip.
-
-⚠️ **No modo inferido, um anúncio pausado hoje ainda aparece como Ativo** — ele já
-gastou hoje antes de ser pausado, e a planilha é diária. Para o status correto,
-adicione a coluna **Veiculação** ao export do Meta **no nível do anúncio**: o
-build a reconhece sozinho e conjunto/campanha passam a ser deduzidos dela.
+### Status de veiculação — não disponível
+A dash não mostra Ativo/Pausado. O export do Meta desta conta não traz a coluna
+`Delivery`/`Veiculação`, e o gasto (diário) não distingue um anúncio rodando de
+um que foi pausado hoje depois de já ter gastado. Para habilitar, adicione a
+coluna **Veiculação** ao export no nível do anúncio e reverta o commit que a
+removeu — ver `CLAUDE.md`.
 
 ### Fuso horário
 `data_inscricao` vem em **America/Sao_Paulo** (UTC−3) e o `Day` do Meta Ads é

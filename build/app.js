@@ -132,12 +132,8 @@ function renderTable(cfg){
   const sortState=STATE.sort[cfg.id];
   let rows=cfg.rows.slice();
   if(sortState){ const {key,dir}=sortState; const c=cfg.cols.find(x=>x.key===key);
-    rows.sort((a,b)=>{
-      // sortKey: célula HTML (ex. chip de veiculação) ordena por um valor cru
-      // paralelo, senão o clique no cabeçalho não faria nada.
-      const sk=(c&&c.sortKey)||key;
-      let va=a.cells[sk], vb=b.cells[sk];
-      if(c && !c.sortKey && c.type==='dim'){ va=norm(va); vb=norm(vb); return dir==='asc'?(va<vb?-1:va>vb?1:0):(va>vb?-1:va<vb?1:0); }
+    rows.sort((a,b)=>{ let va=a.cells[key], vb=b.cells[key];
+      if(c && c.type==='dim'){ va=norm(va); vb=norm(vb); return dir==='asc'?(va<vb?-1:va>vb?1:0):(va>vb?-1:va<vb?1:0); }
       va=(va==null||!isFinite(va))?-Infinity:va; vb=(vb==null||!isFinite(vb))?-Infinity:vb;
       return dir==='asc'?va-vb:vb-va; }); }
   const ext={};
@@ -243,12 +239,8 @@ function renderSplitTable(cfg){
   const sortState=STATE.sort[cfg.id];
   let rows=cfg.rows.slice();
   if(sortState){ const {key,dir}=sortState; const c=cfg.cols.find(x=>x.key===key);
-    rows.sort((a,b)=>{
-      // sortKey: célula HTML (ex. chip de veiculação) ordena por um valor cru
-      // paralelo, senão o clique no cabeçalho não faria nada.
-      const sk=(c&&c.sortKey)||key;
-      let va=a.cells[sk], vb=b.cells[sk];
-      if(c && !c.sortKey && c.type==='dim'){ va=norm(va); vb=norm(vb); return dir==='asc'?(va<vb?-1:va>vb?1:0):(va>vb?-1:va<vb?1:0); }
+    rows.sort((a,b)=>{ let va=a.cells[key], vb=b.cells[key];
+      if(c && c.type==='dim'){ va=norm(va); vb=norm(vb); return dir==='asc'?(va<vb?-1:va>vb?1:0):(va>vb?-1:va<vb?1:0); }
       va=(va==null||!isFinite(va))?-Infinity:va; vb=(vb==null||!isFinite(vb))?-Infinity:vb;
       return dir==='asc'?va-vb:vb-va; }); }
   const ext={};
@@ -543,89 +535,6 @@ function cplByDimChart(id, fL, fM, agg, dim, selSet){
   }
 }
 
-/* ---------------- veiculação (campanha / conjunto / anúncio) ----------------
-   Status REAL vem de DATA.ad_status, alimentado por uma coluna opcional de
-   "Delivery"/"Veiculação" no export do Meta. Enquanto essa coluna não existir
-   (é o caso hoje), a veiculação é INFERIDA pelo gasto do último dia.
-   Por decisão do cliente a leitura é BINÁRIA e usa o mesmo par de rótulos nos
-   dois modos e nos TRÊS níveis (campanha, conjunto e anúncio), em toda a dash:
-   **Ativo** (verde) ou **Pausado** (vermelho). O motivo de estar pausado
-   (parou de entregar x nunca gastou no período) fica no title do chip, para não
-   multiplicar rótulo na tela. */
-const STATUS = DATA.status || {ad:{}, adset:{}, camp:{}};
-const TEM_STATUS_REAL = ['ad','adset','camp'].some(k=>Object.keys(STATUS[k]||{}).length);
-/* normaliza o texto do gerenciador (PT ou EN). A leitura é BINÁRIA por decisão
-   do cliente: verde = entregando, vermelho = não entregando. Qualquer estado que
-   não seja explicitamente ativo é vermelho, mas o rótulo original do Meta é
-   preservado para não esconder a informação. */
-/* norm() do app.js NÃO remove acentos (o do build.py remove). O export em
-   português vem acentuado ("Em veiculação", "Em análise"), então a comparação de
-   status precisa da sua própria normalização, senão "Em veiculação" cairia no
-   default e apareceria como Pausado. */
-const normSt=s=>(s==null?'':String(s)).normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
-function statusRank(txt){
-  const t=normSt(txt);
-  if(!t) return null;
-  // Os estados de NÃO entrega são testados PRIMEIRO de propósito: vários deles
-  // contêm as mesmas palavras dos ativos ("não está em veiculação", "aprendizado
-  // limitado" x "limite de gastos atingido"), então checar "ativo" antes daria
-  // falso positivo e mostraria como Ativo um anúncio que não entrega.
-  const NAO_ATIVO=/(^|\b)(nao|not|sem)\b|paus|desativ|inactive|inativ|(^|\b)off(\b|$)|encerrad|conclu|complet|arquivad|archiv|deleted|excluid|rejeit|reject|reprovad|em analise|in review|erro|error|scheduled|agendad|rascunho|draft|limite de gasto|spending limit/;
-  // Estados de ENTREGA do Meta: ativo, em veiculação e as variações de
-  // aprendizado (que estão entregando, só ainda em fase de aprendizado).
-  const ATIVO=/(^|\b)(active|ativo|ativa|veiculando|entregando|delivering|em veiculacao|aprendizado|learning)/;
-  if(NAO_ATIVO.test(t)) return {rank:1,cls:'c-red',label:'Pausado',title:String(txt).trim()};
-  if(ATIVO.test(t))     return {rank:2,cls:'c-green',label:'Ativo',title:String(txt).trim()};
-  // estado desconhecido: trata como não entregando, mas preserva o texto original
-  return {rank:1,cls:'c-red',label:'Pausado',title:String(txt).trim()};
-}
-
-/* Último dia COM GASTO de cada membro da dimensão (rowsM) e o último dia com
-   gasto do PERÍODO (globalM).
-   Os dois escopos são separados de propósito:
-   - rowsM tem de ser o MESMO escopo que gerou as linhas da tabela, senão a
-     coluna Veiculação contradiz a coluna Gasto da mesma linha;
-   - globalM é sempre o período inteiro, sem filtro cruzado, para que clicar
-     numa linha nunca mude a veiculação das OUTRAS linhas — a referência de
-     "último dia" não pode depender do que está selecionado. */
-function deliveryIndex(rowsM, dim, globalM){
-  const last={}; let lastAll='';
-  rowsM.forEach(r=>{ if(!r.d||!(r.sp>0)) return;
-    if(!last[r[dim]]||r.d>last[r[dim]]) last[r[dim]]=r.d; });
-  (globalM||rowsM).forEach(r=>{ if(!r.d||!(r.sp>0)) return;
-    if(r.d>lastAll) lastAll=r.d; });
-  // anúncios que existem dentro de cada conjunto/campanha, p/ deduzir o status
-  // desses níveis quando a planilha só traz a coluna no nível do anúncio.
-  const ads={};
-  if(dim!=='ad') (globalM||rowsM).forEach(r=>{ (ads[r[dim]]=ads[r[dim]]||new Set()).add(r.ad); });
-  return {last, lastAll, ads};
-}
-/* devolve {html, rank} para a célula de veiculação */
-function deliveryCell(key, idx, dim){
-  const chip=(cls,label,title)=>({html:`<span class="rel-chip ${cls}"${title?` title="${escHtml(title)}"`:''}>${label}</span>`});
-  // 1) status REAL do próprio nível, quando a planilha traz a coluna dele
-  const st=statusRank((STATUS[dim]||{})[key]);
-  if(st) return {...chip(st.cls, st.label, st.title), rank:st.rank};
-  // 2) conjunto/campanha sem coluna própria: deduz dos anúncios que estão dentro.
-  //    Ativo se PELO MENOS UM anúncio dentro está ativo — é o comportamento do
-  //    gerenciador: o conjunto entrega enquanto tiver anúncio ativo.
-  if(dim!=='ad' && Object.keys(STATUS.ad||{}).length && idx.ads && idx.ads[key]){
-    const filhos=[...idx.ads[key]].map(a=>statusRank(STATUS.ad[a])).filter(Boolean);
-    if(filhos.length){
-      const ativo=filhos.some(f=>f.rank===2);
-      return {...chip(ativo?'c-green':'c-red', ativo?'Ativo':'Pausado',
-        (ativo?'pelo menos 1 anúncio ativo':'nenhum anúncio ativo')+' ('+filhos.length+' com status)'),
-        rank:ativo?2:1};
-    }
-  }
-  // 3) sem status na planilha: infere pelo gasto (não enxerga pausa do dia corrente)
-  const d=idx.last[key];
-  const inf=' · inferido pelo gasto (sem coluna de status no export)';
-  if(!d) return {...chip('c-red','Pausado','sem gasto no período'+inf), rank:0};
-  if(d===idx.lastAll) return {...chip('c-green','Ativo','entregou em '+brdate(d)+inf), rank:2};
-  return {...chip('c-red','Pausado','último gasto em '+brdate(d)+inf), rank:1};
-}
-
 /* ---------------- KPI cards ---------------- */
 function kpiCard(k){ return `<div class="kpi ${k.hero?'hero':''}"><div class="kl"><span>${k.label}</span>${k.pill?`<span class="pill q">${k.pill}</span>`:''}</div><div class="kv">${k.val}</div><div class="ka">${k.aux||''}</div></div>`; }
 
@@ -658,10 +567,6 @@ function renderGeralCore(ids){
   });
   const nCampAtivas=Object.values(buildAgg(fL,fM,'camp')).filter(a=>a.sp>0).length;
   const nAdsetsAtivos=Object.values(buildAgg(fL,fM,'adset')).filter(a=>a.sp>0).length;
-  // veiculando = entregou no último dia com gasto do período (ou status real, se a
-  // planilha trouxer a coluna de Delivery)
-  const vIdxG=deliveryIndex(fM,'ad');
-  const nVeiculando=Object.keys(adAgg).filter(ad=>deliveryCell(ad,vIdxG,'ad').rank===2).length;
   const concTop=(t.leads&&topAd)?topAd.m/t.leads:null;
   const adShort=x=>{ x=String(x||'—'); return x.length>22?x.slice(0,21)+'…':x; };
   // melhor e pior dia por CPL (só dias com lead)
@@ -672,7 +577,7 @@ function renderGeralCore(ids){
     {label:'Melhor CPL (anúncio)',val:bestAd?brl(bestAd.v):'-',aux:bestAd?adShort(bestAd.ad):'—'},
     {label:'Top anúncio (leads)',val:topAd?intf(topAd.m):'-',aux:topAd?adShort(topAd.ad):'—'},
     {label:'Concentração top anúncio',val:pct(concTop),aux:'% dos leads no melhor anúncio'},
-    {label:'Anúncios ativos',val:intf(nVeiculando),aux:'de '+intf(nAdsAtivos)+' com gasto · '+intf(nAdsetsAtivos)+' conjuntos · '+intf(nCampAtivas)+' campanhas'},
+    {label:'Anúncios com gasto',val:intf(nAdsAtivos),aux:intf(nAdsetsAtivos)+' conjuntos · '+intf(nCampAtivas)+' campanhas'},
     {label:'Melhor dia (CPL)',val:melhorDia?brl(melhorDia.v):'-',aux:melhorDia?brdate(melhorDia.d):'—'},
     {label:'Cliques por lead',val:t.leads?numf(t.cl/t.leads):'-',aux:'quantos cliques até 1 lead'},
     {label:'Visitas por lead',val:t.leads?numf(t.pv/t.leads):'-',aux:'visitas na LP até 1 lead'},
@@ -788,9 +693,9 @@ function cmpBest(a,b){                       // <0 => a antes (melhor)
    as métricas do meio rolam. Larguras em px casam com o CSS (.rel-adt .stk-*).
    O template tinha 17 colunas com MQL/venda/faturamento; aqui o funil vai até
    o lead, então sobram as métricas de mídia + Leads/CPL/ConvLP. */
-function adRowCells(ad,a,struct,veic){
+function adRowCells(ad,a,struct){
   const d=derive(a);
-  return {ad, veic:veic?veic.html:'', _veic:veic?veic.rank:null, camp:struct.camp, adset:struct.adset,
+  return {ad, camp:struct.camp, adset:struct.adset,
     gasto:d.gasto, im:a.im, cpm:d.cpm, ctr:d.ctr, cpc:d.cpc,
     pv:a.pv, convlp:d.convlp, leads:a.leads, cpl:d.cpl,
     _cpl:d.cpl, status:null};   // valor cru p/ colorir vs meta
@@ -800,7 +705,6 @@ function relRenderAdTable(id,list){
   const el=document.getElementById(id); if(!el) return;
   const cols=[
     {key:'ad',label:'Anúncio',type:'dim',big:true,stk:'l1'},{key:'status',label:'Status',type:'dim',w:140},
-    {key:'veic',label:'Veiculação',type:'html',sortKey:'_veic',w:120},
     {key:'camp',label:'Campanha',type:'dim',big:true},{key:'adset',label:'Conjunto',type:'dim',big:true},
     {key:'gasto',label:'Gasto',type:'brl'},{key:'im',label:'Impr.',type:'int'},
     {key:'cpm',label:'CPM',type:'brl'},{key:'ctr',label:'CTR',type:'pct'},
@@ -809,7 +713,7 @@ function relRenderAdTable(id,list){
     {key:'leads',label:'Leads',type:'int'},{key:'cpl',label:'CPL',type:'brl'},
   ];
   const rows=list.map(item=>{
-    const cells=adRowCells(item.ad,item.a,item.struct,item.veic);
+    const cells=adRowCells(item.ad,item.a,item.struct);
     cells.status='';  // placeholder textual; o chip real entra via afterRender
     return {k:item.ad, cells, _obs:item.obs, _cpl:cells._cpl};
   });
@@ -929,12 +833,11 @@ function renderRelAds(){
   const fL=leadsActive(), fM=metaActive();
   const struct=adStructMap(fM,fL);
   const agg=buildAgg(fL,fM,'ad');
-  const vIdx=deliveryIndex(fM,'ad');
   const pool=Object.entries(agg).filter(([ad,a])=>a.sp>0).map(([ad,a])=>({ad, a, struct:struct[ad]||{camp:'—',adset:'—'}}));
 
   const all=pool.slice().sort((x,y)=>{ const sx=adSampleOk(x.a), sy=adSampleOk(y.a);
     if(sx!==sy) return sx?-1:1; return cmpBest(x.a,y.a); })
-    .map(it=>({...it, obs:!adSampleOk(it.a), veic:deliveryCell(it.ad,vIdx,'ad')}));
+    .map(it=>({...it, obs:!adSampleOk(it.a)}));
   const champs=all.filter(it=>!it.obs).length;
 
   relRenderAdTable('relTop',all);
@@ -1025,15 +928,13 @@ function renderMeta(){
   donutConvLP('mConvLpDonut', t.leads, t.pv);
   // Compilado dos Anúncios — menor CPL no topo
   const adAggM=buildAgg(fL,fM,'ad');
-  const vIdxM=deliveryIndex(fM,'ad',metaActive());
-  const topCplRows=Object.entries(adAggM).map(([ad,a])=>{const d=derive(a), v=deliveryCell(ad,vIdxM,'ad');
-    return {k:ad, cells:{dim:ad,veic:v.html,_veic:v.rank,gasto:d.gasto,pv:a.pv,leads:a.leads,convlp:d.convlp,cpl:d.cpl},
+  const topCplRows=Object.entries(adAggM).map(([ad,a])=>{const d=derive(a);
+    return {k:ad, cells:{dim:ad,gasto:d.gasto,pv:a.pv,leads:a.leads,convlp:d.convlp,cpl:d.cpl},
       _ord:(d.cpl!=null?d.cpl:Infinity)};})
     .sort((a,b)=>a._ord-b._ord).slice(0,10);
   // sem fit: largura automática por coluna + scroll horizontal dentro do card
   renderTable({id:'mTopCpl', center:true,
     cols:[{key:'dim',label:'Anúncios',type:'dim',big:true},
-      {key:'veic',label:'Veiculação',type:'html',sortKey:'_veic',w:104},
       {key:'gasto',label:'Gasto',type:'brl'},
       {key:'pv',label:'Vis. LP',type:'int'},{key:'leads',label:'Leads',type:'int'},
       {key:'convlp',label:'ConvLP',type:'pct'},{key:'cpl',label:'CPL',type:'brl'}],
@@ -1053,33 +954,26 @@ function renderMeta(){
   // rolam horizontalmente juntas (band do meio).
   const hcols=[
     {key:'dim',label:'',type:'dim',big:true,band:'l'},{key:'gasto',label:'Gasto',type:'brl',band:'l'},
-    {key:'veic',label:'Veiculação',type:'html',sortKey:'_veic',w:120},
     {key:'im',label:'Impr.',type:'int'},{key:'cpm',label:'CPM',type:'brl'},
     {key:'cl',label:'Cliques',type:'int'},{key:'ctr',label:'CTR',type:'pct'},{key:'cpc',label:'CPC',type:'brl'},
     {key:'pv',label:'Vis. LP',type:'int'},{key:'cr',label:'CR',type:'pct'},{key:'cpv',label:'CPV',type:'brl'},
     {key:'leads',label:'Leads',type:'int'},{key:'convlp',label:'ConvLP',type:'pct'},{key:'cpl',label:'CPL',type:'brl'},
   ];
-  const hcells=(k,a,veic)=>{const d=derive(a);
-    return {dim:k,gasto:d.gasto,veic:veic?veic.html:'',_veic:veic?veic.rank:null,
-      im:a.im,cpm:d.cpm,cl:a.cl,ctr:d.ctr,cpc:d.cpc,
+  const hcells=(k,a)=>{const d=derive(a);
+    return {dim:k,gasto:d.gasto,im:a.im,cpm:d.cpm,cl:a.cl,ctr:d.ctr,cpc:d.cpc,
       pv:a.pv,cr:d.cr,cpv:d.cpv,leads:a.leads,convlp:d.convlp,cpl:d.cpl};};
-  // scopeM é o MESMO escopo que gerou `map` (Sc/Sa/Sd — exclui o filtro da
-  // própria dimensão), para Gasto e Veiculação nunca se contradizerem na mesma
-  // linha; a referência de "último dia" vem do período inteiro (metaActive()),
-  // para clicar numa linha não alterar a veiculação das outras.
-  function hierRows(map,dim,scopeM){ const idx=deliveryIndex(scopeM,dim,metaActive());
-    return Object.entries(map).map(([k,a])=>({k, cells:hcells(k,a,deliveryCell(k,idx,dim))})); }
-  function totRowOf(tt){ return {...hcells(null,tt,null), dim:null}; }
+  function hierRows(map){ return Object.entries(map).map(([k,a])=>({k, cells:hcells(k,a)})); }
+  function totRowOf(tt){ return {...hcells(null,tt), dim:null}; }
   const Sc=metaScope('C'), Sa=metaScope('A'), Sd=metaScope('D');
   const aggC=buildAgg(Sc.fL,Sc.fM,'camp'), aggA=buildAgg(Sa.fL,Sa.fM,'adset'), aggD=buildAgg(Sd.fL,Sd.fM,'ad');
   // Tabelas hierárquicas: NÃO usam "fit" — a dimensão (campanha/conjunto/anúncio)
   // tem largura automática p/ caber o nome INTEIRO por padrão, nunca quebra linha,
   // é redimensionável (arrastar borda) e 2 cliques na borda auto-ajusta (Sheets/Looker).
-  renderTable({id:'tCamp', cols:hcols.map((c,i)=>i===0?{...c,label:'Campanha'}:c), rows:hierRows(aggC,'camp',Sc.fM), total:totRowOf(totals(Sc.fL,Sc.fM)),
+  renderTable({id:'tCamp', cols:hcols.map((c,i)=>i===0?{...c,label:'Campanha'}:c), rows:hierRows(aggC), total:totRowOf(totals(Sc.fL,Sc.fM)),
     selectable:true, selSet:STATE.mSelC, onSelect:(k,e)=>selDim('C',k,e&&(e.ctrlKey||e.metaKey))});
-  renderTable({id:'tAdset', cols:hcols.map((c,i)=>i===0?{...c,label:'Conjunto',big:true}:c), rows:hierRows(aggA,'adset',Sa.fM), total:totRowOf(totals(Sa.fL,Sa.fM)),
+  renderTable({id:'tAdset', cols:hcols.map((c,i)=>i===0?{...c,label:'Conjunto',big:true}:c), rows:hierRows(aggA), total:totRowOf(totals(Sa.fL,Sa.fM)),
     selectable:true, selSet:STATE.mSelA, onSelect:(k,e)=>selDim('A',k,e&&(e.ctrlKey||e.metaKey))});
-  renderTable({id:'tAd', cols:hcols.map((c,i)=>i===0?{...c,label:'Anúncio'}:c), rows:hierRows(aggD,'ad',Sd.fM), total:totRowOf(totals(Sd.fL,Sd.fM)),
+  renderTable({id:'tAd', cols:hcols.map((c,i)=>i===0?{...c,label:'Anúncio'}:c), rows:hierRows(aggD), total:totRowOf(totals(Sd.fL,Sd.fM)),
     selectable:true, selSet:STATE.mSelAd, onSelect:(k,e)=>selDim('D',k,e&&(e.ctrlKey||e.metaKey))});
 
   // cada gráfico varia a dimensão da sua tabela — CPL por dia, 1 linha por membro,

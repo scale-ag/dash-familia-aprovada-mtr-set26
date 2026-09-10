@@ -395,20 +395,7 @@ def process(leads_rows, meta_rows):
          "adset": ["ad set name", "adset"], "ad": ["ad name"],
          "spent": ["amount spent", "valor gasto", "gasto"], "impr": ["impressions", "impress"],
          "clicks": ["link clicks", "clicks", "cliques"],
-         "pv": ["landing page views", "page views", "pageviews"],
-         # Colunas OPCIONAIS de veiculação ("Delivery" no Meta / "Veiculação" no
-         # export em português). Hoje NENHUMA existe neste export — enquanto não
-         # existirem, a dash cai na veiculação INFERIDA pelo gasto, que NÃO
-         # enxerga um anúncio pausado HOJE (ele já gastou hoje antes de ser
-         # pausado, e a planilha é diária, não horária). Basta adicionar a coluna
-         # que o status real passa a valer, sem mexer no código.
-         # Uma coluna por nível; a de anúncio é a mais importante, porque conjunto
-         # e campanha são deduzidos dela quando não vierem explícitos.
-         "status": ["ad delivery", "veiculacao do anuncio", "ad status",
-                    "delivery", "veiculacao", "effective status", "status", "entrega"],
-         "adset_status": ["ad set delivery", "adset delivery", "veiculacao do conjunto",
-                          "ad set status", "adset status"],
-         "camp_status": ["campaign delivery", "veiculacao da campanha", "campaign status"]},
+         "pv": ["landing page views", "page views", "pageviews"]},
         {"day": 0, "campaign": 1, "adset": 2, "ad": 3, "impr": 4, "clicks": 5, "pv": 6, "spent": 7},
     )
 
@@ -416,23 +403,9 @@ def process(leads_rows, meta_rows):
     # Anúncio -> status REAL de veiculação, quando a coluna existir. Guarda o
     # valor do dia MAIS RECENTE em que o anúncio aparece (o status de ontem não
     # deve sobrescrever o de hoje).
-    # nível -> nome -> (dia, status). Guarda o valor do dia MAIS RECENTE em que o
-    # membro aparece: o status de ontem não pode sobrescrever o de hoje.
-    status_por_nivel: dict[str, dict[str, tuple[str, str]]] = {"ad": {}, "adset": {}, "camp": {}}
     for row in meta_rows[1:]:
         if not any((c or "").strip() for c in row):
             continue
-        dia = parse_date(cell(row, midx["day"])) or ""
-        for nivel, col_status, col_nome in (("ad", "status", "ad"),
-                                            ("adset", "adset_status", "adset"),
-                                            ("camp", "camp_status", "campaign")):
-            st = cell(row, midx[col_status])
-            nome = cell(row, midx[col_nome])
-            if not st or not nome:
-                continue
-            atual = status_por_nivel[nivel].get(nome)
-            if atual is None or dia >= atual[0]:
-                status_por_nivel[nivel][nome] = (dia, st)
         meta.append({
             "d": parse_date(cell(row, midx["day"])),
             "camp": cell(row, midx["campaign"]) or "(sem campanha)",
@@ -472,12 +445,6 @@ def process(leads_rows, meta_rows):
         },
         "leads": leads,
         "meta": meta,
-        # Status real de veiculação vindo da planilha, por nível. Vazios enquanto
-        # não houver coluna de Delivery/Veiculação no export do Meta. O front usa
-        # o nível explícito quando existe e, para conjunto/campanha sem coluna
-        # própria, deduz do status dos anúncios que estão dentro deles.
-        "status": {nivel: {nome: st for nome, (_, st) in m.items()}
-                   for nivel, m in status_por_nivel.items()},
         # Insights de Tráfego (texto pré-escrito, lido de relatorios.json). Preenchido
         # em main() via load_briefings(); fica {} se relatorios.json não existir.
         "briefings": {},
@@ -564,15 +531,6 @@ def main():
           f"{d['teste']} de teste", file=sys.stderr)
     print(f"  meta      : {len(data['meta'])} linhas · gasto R$ {sp:,.2f} "
           f"(sem imposto; fator {TAX_FACTOR})", file=sys.stderr)
-    st = data["status"]
-    achados = [f"{len(st[k])} {rot}" for k, rot in
-               (("ad", "anúncio(s)"), ("adset", "conjunto(s)"), ("camp", "campanha(s)")) if st[k]]
-    if achados:
-        veic = "status real na planilha para " + " · ".join(achados)
-    else:
-        veic = ("SEM coluna de status no export; a dash infere pelo gasto do dia "
-                "(NÃO detecta o que foi pausado hoje)")
-    print(f"  veiculação: {veic}", file=sys.stderr)
     print(f"  out       : {args.out}", file=sys.stderr)
 
 
