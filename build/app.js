@@ -563,12 +563,20 @@ function statusRank(txt){
   if(/(paus|inactive|inativo|desativ|off|encerrad|arquivad|deleted|excluid)/.test(t)) return {rank:1,cls:'c-red',label:'Pausado'};
   return {rank:0,cls:'c-red',label:String(txt).trim()};   // qualquer outro estado do Meta, exibido como veio
 }
-/* último dia COM GASTO de cada membro da dimensão, e o do período inteiro */
-function deliveryIndex(fM, dim){
+/* Último dia COM GASTO de cada membro da dimensão (rowsM) e o último dia com
+   gasto do PERÍODO (globalM).
+   Os dois escopos são separados de propósito:
+   - rowsM tem de ser o MESMO escopo que gerou as linhas da tabela, senão a
+     coluna Veiculação contradiz a coluna Gasto da mesma linha;
+   - globalM é sempre o período inteiro, sem filtro cruzado, para que clicar
+     numa linha nunca mude a veiculação das OUTRAS linhas — a referência de
+     "último dia" não pode depender do que está selecionado. */
+function deliveryIndex(rowsM, dim, globalM){
   const last={}; let lastAll='';
-  fM.forEach(r=>{ if(!r.d||!(r.sp>0)) return;
-    if(r.d>lastAll) lastAll=r.d;
+  rowsM.forEach(r=>{ if(!r.d||!(r.sp>0)) return;
     if(!last[r[dim]]||r.d>last[r[dim]]) last[r[dim]]=r.d; });
+  (globalM||rowsM).forEach(r=>{ if(!r.d||!(r.sp>0)) return;
+    if(r.d>lastAll) lastAll=r.d; });
   return {last, lastAll};
 }
 /* devolve {html, rank} para a célula de veiculação */
@@ -1017,10 +1025,11 @@ function renderMeta(){
     return {dim:k,gasto:d.gasto,veic:veic?veic.html:'',_veic:veic?veic.rank:null,
       im:a.im,cpm:d.cpm,cl:a.cl,ctr:d.ctr,cpc:d.cpc,
       pv:a.pv,cr:d.cr,cpv:d.cpv,leads:a.leads,convlp:d.convlp,cpl:d.cpl};};
-  // a veiculação é lida do escopo COMPLETO da mídia (fM), não do escopo filtrado
-  // da própria dimensão — senão selecionar uma linha faria as outras parecerem
-  // paradas só por terem saído do filtro.
-  function hierRows(map,dim,scopeM){ const idx=deliveryIndex(scopeM,dim);
+  // scopeM é o MESMO escopo que gerou `map` (Sc/Sa/Sd — exclui o filtro da
+  // própria dimensão), para Gasto e Veiculação nunca se contradizerem na mesma
+  // linha; a referência de "último dia" vem do período inteiro (metaActive()),
+  // para clicar numa linha não alterar a veiculação das outras.
+  function hierRows(map,dim,scopeM){ const idx=deliveryIndex(scopeM,dim,metaActive());
     return Object.entries(map).map(([k,a])=>({k, cells:hcells(k,a,deliveryCell(k,idx,dim))})); }
   function totRowOf(tt){ return {...hcells(null,tt,null), dim:null}; }
   const Sc=metaScope('C'), Sa=metaScope('A'), Sd=metaScope('D');
@@ -1028,11 +1037,11 @@ function renderMeta(){
   // Tabelas hierárquicas: NÃO usam "fit" — a dimensão (campanha/conjunto/anúncio)
   // tem largura automática p/ caber o nome INTEIRO por padrão, nunca quebra linha,
   // é redimensionável (arrastar borda) e 2 cliques na borda auto-ajusta (Sheets/Looker).
-  renderTable({id:'tCamp', cols:hcols.map((c,i)=>i===0?{...c,label:'Campanha'}:c), rows:hierRows(aggC,'camp',fM), total:totRowOf(totals(Sc.fL,Sc.fM)),
+  renderTable({id:'tCamp', cols:hcols.map((c,i)=>i===0?{...c,label:'Campanha'}:c), rows:hierRows(aggC,'camp',Sc.fM), total:totRowOf(totals(Sc.fL,Sc.fM)),
     selectable:true, selSet:STATE.mSelC, onSelect:(k,e)=>selDim('C',k,e&&(e.ctrlKey||e.metaKey))});
-  renderTable({id:'tAdset', cols:hcols.map((c,i)=>i===0?{...c,label:'Conjunto',big:true}:c), rows:hierRows(aggA,'adset',fM), total:totRowOf(totals(Sa.fL,Sa.fM)),
+  renderTable({id:'tAdset', cols:hcols.map((c,i)=>i===0?{...c,label:'Conjunto',big:true}:c), rows:hierRows(aggA,'adset',Sa.fM), total:totRowOf(totals(Sa.fL,Sa.fM)),
     selectable:true, selSet:STATE.mSelA, onSelect:(k,e)=>selDim('A',k,e&&(e.ctrlKey||e.metaKey))});
-  renderTable({id:'tAd', cols:hcols.map((c,i)=>i===0?{...c,label:'Anúncio'}:c), rows:hierRows(aggD,'ad',fM), total:totRowOf(totals(Sd.fL,Sd.fM)),
+  renderTable({id:'tAd', cols:hcols.map((c,i)=>i===0?{...c,label:'Anúncio'}:c), rows:hierRows(aggD,'ad',Sd.fM), total:totRowOf(totals(Sd.fL,Sd.fM)),
     selectable:true, selSet:STATE.mSelAd, onSelect:(k,e)=>selDim('D',k,e&&(e.ctrlKey||e.metaKey))});
 
   // cada gráfico varia a dimensão da sua tabela — CPL por dia, 1 linha por membro,
