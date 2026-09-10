@@ -87,36 +87,45 @@ sigla       etapa    público     obj.   estrutura
 - `E2-CAP` = etapa 2 / captação · `P1-QUENTE` = público quente · `LEAD` = objetivo · `ABO`.
 
 ### Veiculação (campanha, conjunto e anúncio)
-Coluna **Veiculação** em TODAS as listas de dimensão da dash — as 3 tabelas
-hierárquicas, o Compilado dos Anúncios e a tabela de anúncios do Relatório —
-mais o KPI "Anúncios ativos" na Visão Geral. Dois modos:
+Coluna **Veiculação** em TODAS as listas de dimensão (3 tabelas hierárquicas,
+Compilado dos Anúncios e tabela de anúncios do Relatório) + KPI "Anúncios ativos".
+Leitura binária: **Ativo** (verde) ou **Pausado** (vermelho). Resolvida em 3
+degraus, nesta ordem (`app.js` → `deliveryCell`):
 
-1. **Status real** — se o export do Meta trouxer uma coluna de veiculação
-   (`Ad Delivery`, `Delivery`, `Veiculação`, `Status`, `Effective Status`,
-   `Entrega`), `build.py` a lê e emite `DATA.ad_status` (anúncio → status do dia
-   mais recente).
-2. **Inferido pelo gasto** — enquanto a coluna não existir (**é o caso hoje**),
-   `deliveryCell()` usa o último dia COM GASTO do membro.
+1. **Status real do próprio nível** — `DATA.status.{ad,adset,camp}`, alimentado
+   por colunas OPCIONAIS do export (`Ad Delivery`/`Veiculação` para anúncio,
+   `Ad Set Delivery` para conjunto, `Campaign Delivery` para campanha).
+2. **Dedução a partir dos anúncios** — conjunto/campanha sem coluna própria ficam
+   **Ativo se pelo menos UM anúncio dentro estiver ativo**, que é o comportamento
+   do gerenciador. Ou seja: basta adicionar a coluna no nível do ANÚNCIO para os
+   três níveis ficarem corretos.
+3. **Inferência pelo gasto** — só quando não há status nenhum (**é o caso hoje**):
+   Ativo se gastou no último dia com gasto do período.
 
-**Leitura binária, por decisão do cliente:** só **Ativo** (verde) e **Pausado**
-(vermelho), com os MESMOS rótulos nos dois modos e nos três níveis. Qualquer
-estado que não seja explicitamente ativo é Pausado; o motivo (parou de entregar,
-nunca gastou no período, ou o texto original do gerenciador) fica no `title` do
-chip, para não multiplicar rótulo na tela. O rank numérico (`_veic`) mantém 3
-níveis para a ordenação separar "parou" de "nunca gastou".
+> **Limite conhecido e importante da inferência:** ela **não enxerga um anúncio
+> pausado no dia corrente**. Se o anúncio gastou de manhã e foi pausado à tarde,
+> ele continua "Ativo" até o dia virar, porque a planilha tem granularidade
+> DIÁRIA, não horária. Nenhuma heurística sobre gasto diário resolve isso — só a
+> coluna de status resolve. O tooltip do chip diz quando o valor é inferido.
+
+`statusRank()` classifica o texto do gerenciador (PT/EN) e testa os estados de
+NÃO entrega ANTES dos de entrega, porque vários se sobrepõem
+("não está em veiculação" contém "em veiculação"). Estados de entrega incluem as
+variações de **aprendizado** ("Em aprendizado", "Aprendizado limitado",
+"Learning limited"), que ENTREGAM. Usa `normSt()`, com remoção de acentos própria
+— o `norm()` geral do `app.js` não remove acentos e o export em português vem
+acentuado. Há um teste de 26 estados reais do gerenciador.
 
 **`deliveryIndex(rowsM, dim, globalM)` recebe dois escopos, e isso importa:**
-- `rowsM` tem de ser o MESMO escopo que gerou as linhas da tabela (`Sc`/`Sa`/`Sd`,
-  que excluem o filtro da própria dimensão). Passar o escopo totalmente filtrado
-  (`fM`) faz a coluna contradizer o Gasto da mesma linha — foi um bug real:
-  clicar numa campanha marcava as outras como pausadas mesmo com gasto na tela.
-- `globalM` é sempre `metaActive()` (período inteiro, sem filtro cruzado) e serve
-  só para o "último dia com gasto" de referência, para que selecionar uma linha
-  nunca altere o status das OUTRAS.
+- `rowsM` = o MESMO escopo que gerou as linhas (`Sc`/`Sa`/`Sd`, que excluem o
+  filtro da própria dimensão). Passar o escopo totalmente filtrado (`fM`) faz a
+  coluna contradizer o Gasto da mesma linha — foi um bug real.
+- `globalM` = `metaActive()` (período inteiro), só para o "último dia com gasto"
+  de referência, para selecionar uma linha nunca alterar o status das OUTRAS.
+  Também é dele que sai o mapa conjunto/campanha → anúncios do degrau 2.
 
-A coluna é `type:'html'` (chip colorido) com `sortKey:'_veic'` — `sortKey` é uma
-extensão da engine de tabela para ordenar célula HTML por um valor cru paralelo,
-sem a qual o clique no cabeçalho seria um no-op.
+A coluna é `type:'html'` com `sortKey:'_veic'` (rank numérico paralelo), extensão
+da engine de tabela sem a qual o clique no cabeçalho seria um no-op.
 
 ### Fuso horário (crítico para o CPL diário)
 A planilha de Leads grava `data_inscricao` em **America/Sao_Paulo** (UTC−3), mas o
@@ -258,9 +267,10 @@ fixa por métrica.
 ## Lacunas de dados
 - **Checkouts / VisCHK** → dependeriam de `Adds to Cart` no export do Meta; não existem.
 - **Link do criativo** → dependeria de uma coluna de permalink no export do Meta; não existe.
-- **Status real do anúncio (Ativo/Pausado)** → dependeria de uma coluna de
-  `Delivery`/`Veiculação` no export do Meta; não existe. A dash mostra a
-  veiculação inferida pelo gasto até a coluna aparecer (ver acima).
+- **Status real de veiculação** → dependeria de uma coluna de
+  `Delivery`/`Veiculação` no export do Meta; não existe. Até ela aparecer, a dash
+  infere pelo gasto e **não detecta pausa feita no dia corrente** (ver acima).
+  Adicionar a coluna no nível do ANÚNCIO já corrige os três níveis.
 - Etapas pós-lead (MQL, vendas, faturamento) → ver "O que NÃO existe nesta conta".
 
 ## Publicação — problemas conhecidos

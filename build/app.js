@@ -552,20 +552,34 @@ function cplByDimChart(id, fL, fM, agg, dim, selSet){
    **Ativo** (verde) ou **Pausado** (vermelho). O motivo de estar pausado
    (parou de entregar x nunca gastou no período) fica no title do chip, para não
    multiplicar rótulo na tela. */
-const AD_STATUS = DATA.ad_status || {};
-const TEM_STATUS_REAL = Object.keys(AD_STATUS).length > 0;
+const STATUS = DATA.status || {ad:{}, adset:{}, camp:{}};
+const TEM_STATUS_REAL = ['ad','adset','camp'].some(k=>Object.keys(STATUS[k]||{}).length);
 /* normaliza o texto do gerenciador (PT ou EN). A leitura é BINÁRIA por decisão
    do cliente: verde = entregando, vermelho = não entregando. Qualquer estado que
    não seja explicitamente ativo é vermelho, mas o rótulo original do Meta é
    preservado para não esconder a informação. */
+/* norm() do app.js NÃO remove acentos (o do build.py remove). O export em
+   português vem acentuado ("Em veiculação", "Em análise"), então a comparação de
+   status precisa da sua própria normalização, senão "Em veiculação" cairia no
+   default e apareceria como Pausado. */
+const normSt=s=>(s==null?'':String(s)).normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
 function statusRank(txt){
-  const t=norm(txt);
+  const t=normSt(txt);
   if(!t) return null;
-  if(/(^|\b)(active|ativo|ativa|veiculando|em veiculacao|em veiculação)/.test(t)) return {rank:2,cls:'c-green',label:'Ativo'};
-  // qualquer estado que não seja explicitamente ativo é Pausado; o texto original
-  // do gerenciador vai no title, para não se perder.
+  // Os estados de NÃO entrega são testados PRIMEIRO de propósito: vários deles
+  // contêm as mesmas palavras dos ativos ("não está em veiculação", "aprendizado
+  // limitado" x "limite de gastos atingido"), então checar "ativo" antes daria
+  // falso positivo e mostraria como Ativo um anúncio que não entrega.
+  const NAO_ATIVO=/(^|\b)(nao|not|sem)\b|paus|desativ|inactive|inativ|(^|\b)off(\b|$)|encerrad|conclu|complet|arquivad|archiv|deleted|excluid|rejeit|reject|reprovad|em analise|in review|erro|error|scheduled|agendad|rascunho|draft|limite de gasto|spending limit/;
+  // Estados de ENTREGA do Meta: ativo, em veiculação e as variações de
+  // aprendizado (que estão entregando, só ainda em fase de aprendizado).
+  const ATIVO=/(^|\b)(active|ativo|ativa|veiculando|entregando|delivering|em veiculacao|aprendizado|learning)/;
+  if(NAO_ATIVO.test(t)) return {rank:1,cls:'c-red',label:'Pausado',title:String(txt).trim()};
+  if(ATIVO.test(t))     return {rank:2,cls:'c-green',label:'Ativo',title:String(txt).trim()};
+  // estado desconhecido: trata como não entregando, mas preserva o texto original
   return {rank:1,cls:'c-red',label:'Pausado',title:String(txt).trim()};
 }
+
 /* Último dia COM GASTO de cada membro da dimensão (rowsM) e o último dia com
    gasto do PERÍODO (globalM).
    Os dois escopos são separados de propósito:
@@ -580,19 +594,36 @@ function deliveryIndex(rowsM, dim, globalM){
     if(!last[r[dim]]||r.d>last[r[dim]]) last[r[dim]]=r.d; });
   (globalM||rowsM).forEach(r=>{ if(!r.d||!(r.sp>0)) return;
     if(r.d>lastAll) lastAll=r.d; });
-  return {last, lastAll};
+  // anúncios que existem dentro de cada conjunto/campanha, p/ deduzir o status
+  // desses níveis quando a planilha só traz a coluna no nível do anúncio.
+  const ads={};
+  if(dim!=='ad') (globalM||rowsM).forEach(r=>{ (ads[r[dim]]=ads[r[dim]]||new Set()).add(r.ad); });
+  return {last, lastAll, ads};
 }
 /* devolve {html, rank} para a célula de veiculação */
 function deliveryCell(key, idx, dim){
   const chip=(cls,label,title)=>({html:`<span class="rel-chip ${cls}"${title?` title="${escHtml(title)}"`:''}>${label}</span>`});
-  if(dim==='ad'){
-    const st=statusRank(AD_STATUS[key]);
-    if(st) return {...chip(st.cls, st.label, st.title), rank:st.rank};
+  // 1) status REAL do próprio nível, quando a planilha traz a coluna dele
+  const st=statusRank((STATUS[dim]||{})[key]);
+  if(st) return {...chip(st.cls, st.label, st.title), rank:st.rank};
+  // 2) conjunto/campanha sem coluna própria: deduz dos anúncios que estão dentro.
+  //    Ativo se PELO MENOS UM anúncio dentro está ativo — é o comportamento do
+  //    gerenciador: o conjunto entrega enquanto tiver anúncio ativo.
+  if(dim!=='ad' && Object.keys(STATUS.ad||{}).length && idx.ads && idx.ads[key]){
+    const filhos=[...idx.ads[key]].map(a=>statusRank(STATUS.ad[a])).filter(Boolean);
+    if(filhos.length){
+      const ativo=filhos.some(f=>f.rank===2);
+      return {...chip(ativo?'c-green':'c-red', ativo?'Ativo':'Pausado',
+        (ativo?'pelo menos 1 anúncio ativo':'nenhum anúncio ativo')+' ('+filhos.length+' com status)'),
+        rank:ativo?2:1};
+    }
   }
+  // 3) sem status na planilha: infere pelo gasto (não enxerga pausa do dia corrente)
   const d=idx.last[key];
-  if(!d) return {...chip('c-red','Pausado','sem gasto no período'), rank:0};
-  if(d===idx.lastAll) return {...chip('c-green','Ativo','entregou em '+brdate(d)), rank:2};
-  return {...chip('c-red','Pausado','último gasto em '+brdate(d)), rank:1};
+  const inf=' · inferido pelo gasto (sem coluna de status no export)';
+  if(!d) return {...chip('c-red','Pausado','sem gasto no período'+inf), rank:0};
+  if(d===idx.lastAll) return {...chip('c-green','Ativo','entregou em '+brdate(d)+inf), rank:2};
+  return {...chip('c-red','Pausado','último gasto em '+brdate(d)+inf), rank:1};
 }
 
 /* ---------------- KPI cards ---------------- */

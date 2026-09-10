@@ -111,7 +111,7 @@
         </div>
 
         <h2 class="sec-title">Hierarquia · Campanha → Conjunto → Anúncio</h2>
-        <p class="note" style="padding:0 0 10px">A coluna <b>Veiculação</b> mostra o status real do gerenciador quando o export do Meta traz a coluna <i>Delivery</i>/<i>Veiculação</i>. Enquanto ela não existir, é <b>inferida pelo gasto</b>: <span class="rel-chip c-green">Ativo</span> entregou no último dia do período · <span class="rel-chip c-red">Pausado</span> não entregou. Passe o mouse no chip para ver o dia do último gasto.</p>
+        <p class="note" style="padding:0 0 10px">A coluna <b>Veiculação</b> mostra o status real do gerenciador quando o export do Meta traz a coluna <i>Delivery</i>/<i>Veiculação</i>. Enquanto ela não existir, é <b>inferida pelo gasto do dia</b> — e nesse modo <b>um anúncio pausado hoje ainda aparece como Ativo</b>, porque ele já gastou hoje antes de ser pausado e a planilha é diária, não horária. <span class="rel-chip c-green">Ativo</span> · <span class="rel-chip c-red">Pausado</span>. Passe o mouse no chip para ver o motivo e se o valor é real ou inferido.</p>
         <div class="table-chart-pair">
           <div class="thead-title">Campanhas</div>
           <div class="tbl-wrap tbl-normal"><table class="dt" id="tCamp"></table></div>
@@ -203,7 +203,7 @@
         <h2 class="sec-title">Top Anúncios <span class="pill q" id="relTopCount"></span></h2>
         <div class="card" style="padding:0">
           <div class="tbl-wrap"><table class="dt rel-adt" id="relTop"></table></div>
-          <p class="note" style="padding:10px 15px 0">A coluna <b>Veiculação</b> mostra o status real do gerenciador quando o export do Meta traz a coluna <i>Delivery</i>/<i>Veiculação</i>. Enquanto ela não existir, é <b>inferida pelo gasto</b>: <span class="rel-chip c-green">Ativo</span> entregou no último dia do período · <span class="rel-chip c-red">Pausado</span> não entregou. Passe o mouse no chip para ver o dia do último gasto.</p>
+          <p class="note" style="padding:10px 15px 0">A coluna <b>Veiculação</b> mostra o status real do gerenciador quando o export do Meta traz a coluna <i>Delivery</i>/<i>Veiculação</i>. Enquanto ela não existir, é <b>inferida pelo gasto do dia</b> — e nesse modo <b>um anúncio pausado hoje ainda aparece como Ativo</b>, porque ele já gastou hoje antes de ser pausado e a planilha é diária, não horária. <span class="rel-chip c-green">Ativo</span> · <span class="rel-chip c-red">Pausado</span>. Passe o mouse no chip para ver o motivo e se o valor é real ou inferido.</p>
           <p class="note" style="padding:10px 15px">Ranqueados por <b>volume de leads</b> e, no empate, menor <b>CPL</b>, exigindo <b>amostra relevante</b> (gasto e nº de leads mínimos do painel de metas). Anúncios promissores sem amostra suficiente aparecem como <b>Em observação</b>. Rolagem lateral dentro da tabela.</p>
         </div>
 
