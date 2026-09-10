@@ -45,11 +45,12 @@ ROAS — não existe fonte de dados para nada disso, então nenhuma dessas métr
 `Adds to Cart`/`Subscriptions` (sem Checkouts) nem permalink do criativo.
 
 ### Veiculação do anúncio
-A coluna **Veiculação** mostra o status real do gerenciador **se** o export do
-Meta tiver uma coluna de `Delivery`/`Veiculação` — hoje ele **não tem**, então a
-dash infere pelo gasto: *Veiculando* (gastou no último dia do período),
-*Sem entrega* (gastou antes, não no último dia) e *Sem gasto*. Para ter o status
-real, adicione a coluna no export; o build a reconhece sozinho.
+A coluna **Veiculação** aparece em todas as listas de campanha, conjunto e
+anúncio. Mostra o status real do gerenciador **se** o export do Meta tiver uma
+coluna de `Delivery`/`Veiculação` — hoje ele **não tem**, então a dash infere
+pelo gasto do último dia. A leitura é binária: **Ativo** (verde) ou **Pausado**
+(vermelho); o motivo fica no tooltip do chip. Para ter o status real, adicione a
+coluna no export; o build a reconhece sozinho.
 
 ### Fuso horário
 `data_inscricao` vem em **America/Sao_Paulo** (UTC−3) e o `Day` do Meta Ads é

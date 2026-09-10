@@ -86,35 +86,37 @@ sigla       etapa    público     obj.   estrutura
 - **Sigla do funil: `MTR-SET26`** (`MAIN_PRODUCT_PREFIX`) — só existe uma nesta conta.
 - `E2-CAP` = etapa 2 / captação · `P1-QUENTE` = público quente · `LEAD` = objetivo · `ABO`.
 
-### Veiculação do anúncio (Ativo/Pausado)
-Coluna **Veiculação** nas 3 tabelas hierárquicas e na tabela de anúncios do
-Relatório, mais o KPI "Anúncios veiculando" na Visão Geral. Funciona em dois modos:
+### Veiculação (campanha, conjunto e anúncio)
+Coluna **Veiculação** em TODAS as listas de dimensão da dash — as 3 tabelas
+hierárquicas, o Compilado dos Anúncios e a tabela de anúncios do Relatório —
+mais o KPI "Anúncios ativos" na Visão Geral. Dois modos:
 
 1. **Status real** — se o export do Meta trouxer uma coluna de veiculação
    (`Ad Delivery`, `Delivery`, `Veiculação`, `Status`, `Effective Status`,
    `Entrega`), `build.py` a lê e emite `DATA.ad_status` (anúncio → status do dia
-   mais recente). `app.js` → `statusRank()` normaliza PT/EN para
-   **Ativo** (verde) · **Pausado** (vermelho) · qualquer outro estado do Meta
-   exibido como veio, também em vermelho.
+   mais recente).
 2. **Inferido pelo gasto** — enquanto a coluna não existir (**é o caso hoje**),
-   `app.js` → `deliveryCell()` usa o último dia COM GASTO de cada anúncio:
-   **Veiculando** = gastou no último dia do período · **Sem entrega** = já gastou
-   antes, mas não no último dia · **Sem gasto** = nada no período.
+   `deliveryCell()` usa o último dia COM GASTO do membro.
 
-A leitura da coluna é **binária por decisão do cliente**: só verde (entregando) e
-vermelho (não entregando) — sem faixa amarela. O rank numérico (`_veic`) mantém
-os 3 níveis para a ordenação continuar separando "Sem entrega" de "Sem gasto".
-Isso vale só para a Veiculação; o amarelo continua nas outras escalas (CPL vs
-meta e badge "Em observação"), que são de atenção, não de status.
+**Leitura binária, por decisão do cliente:** só **Ativo** (verde) e **Pausado**
+(vermelho), com os MESMOS rótulos nos dois modos e nos três níveis. Qualquer
+estado que não seja explicitamente ativo é Pausado; o motivo (parou de entregar,
+nunca gastou no período, ou o texto original do gerenciador) fica no `title` do
+chip, para não multiplicar rótulo na tela. O rank numérico (`_veic`) mantém 3
+níveis para a ordenação separar "parou" de "nunca gastou".
 
-Os rótulos são diferentes de propósito: "Veiculando/Sem entrega" deixa claro que
-é entrega observada, não o botão do gerenciador. Campanha e conjunto sempre usam
-o modo inferido (a coluna de status é por anúncio). Para ligar o modo real basta
-adicionar a coluna no export — **nenhuma mudança de código**.
+**`deliveryIndex(rowsM, dim, globalM)` recebe dois escopos, e isso importa:**
+- `rowsM` tem de ser o MESMO escopo que gerou as linhas da tabela (`Sc`/`Sa`/`Sd`,
+  que excluem o filtro da própria dimensão). Passar o escopo totalmente filtrado
+  (`fM`) faz a coluna contradizer o Gasto da mesma linha — foi um bug real:
+  clicar numa campanha marcava as outras como pausadas mesmo com gasto na tela.
+- `globalM` é sempre `metaActive()` (período inteiro, sem filtro cruzado) e serve
+  só para o "último dia com gasto" de referência, para que selecionar uma linha
+  nunca altere o status das OUTRAS.
 
-A coluna é `type:'html'` (chip colorido) com `sortKey:'_veic'`, um rank numérico
-paralelo — sem isso o clique no cabeçalho não ordenaria. `sortKey` é uma extensão
-da engine de tabela, disponível para qualquer coluna HTML futura.
+A coluna é `type:'html'` (chip colorido) com `sortKey:'_veic'` — `sortKey` é uma
+extensão da engine de tabela para ordenar célula HTML por um valor cru paralelo,
+sem a qual o clique no cabeçalho seria um no-op.
 
 ### Fuso horário (crítico para o CPL diário)
 A planilha de Leads grava `data_inscricao` em **America/Sao_Paulo** (UTC−3), mas o

@@ -13,7 +13,7 @@
 - **Fontes:** duas planilhas Google (Leads da LP + Meta Ads), somente leitura. IDs/gids no topo de `build/build.py`.
 - **Funil:** `Gasto → Impressões → Cliques → Visitas na LP → Leads`. Termina no lead.
 - **Lead válido:** `utm_source=Meta-Ads` **e** campanha começando com `MTR-SET26` **e** nome/e-mail/telefone preenchidos (`is_valid_lead`).
-- **Veiculação:** coluna `Delivery`/`Veiculação` no export do Meta ativa o status real (`ad_status`); sem ela, a dash infere pelo gasto do último dia (`deliveryCell`). Não é preciso mexer no código para migrar.
+- **Veiculação:** binária (Ativo verde / Pausado vermelho) em campanha, conjunto e anúncio, em toda a dash. Coluna `Delivery`/`Veiculação` no export do Meta ativa o status real (`ad_status`); sem ela, infere pelo gasto do último dia (`deliveryCell`). `deliveryIndex` recebe o escopo das linhas E o escopo global — trocar isso reintroduz o bug de status contraditório ao filtrar.
 - **Fuso:** leads vêm em America/Sao_Paulo e são convertidos para **America/Noronha** (fuso da conta de anúncios) antes de virar dia — `parse_lead_date`. Lead ≥23h conta no dia seguinte.
 - **Não existe nesta conta:** MQL, compradores, vendas, faturamento, receita, CAC, ROAS, Checkouts, link do criativo. Não tente reintroduzir sem fonte de dados.
 - **Build:** `python build/build.py --leads-file leads.csv --meta-file meta.csv --out dist/index.html` (sem os flags, busca os CSVs públicos — precisa alcançar `docs.google.com`).
