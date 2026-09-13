@@ -906,7 +906,9 @@ function selDim(dim,key,ctrl){
   if(ctrl){ s.has(key)?s.delete(key):s.add(key); }
   else { const sole=s.has(key)&&s.size===1&&!Object.entries(sets).some(([k2,x])=>k2!==dim&&x.size);
     Object.values(sets).forEach(x=>x.clear()); if(!sole) s.add(key); }
-  renderMeta();
+  // renderAll (e não renderMeta direto) para a barra de filtros ativos no topo
+  // acompanhar o clique — era por isso que dava para filtrar sem nenhum aviso.
+  renderAll();
 }
 function renderMeta(){
   const F=metaScope(null), fL=F.fL, fM=F.fM;   // KPIs, funil, graficos e tabela diaria
@@ -1092,7 +1094,44 @@ function setPage(p){ STATE.page=p;
   history.replaceState(null,'', p==='meta'?'#meta':(p==='rel'?'#rel':'#geral'));
   renderAll();
 }
-function renderAll(){ if(STATE.page==='meta') renderMeta(); else if(STATE.page==='rel') renderRelatorio(); else renderGeral(); }
+/* ---------------- barra de filtros ativos ----------------
+   Clicar numa linha de campanha/conjunto/anúncio filtra a página inteira,
+   inclusive o funil e a tabela diária, que ficam ACIMA das tabelas onde o
+   clique acontece. Sem um aviso fixo no topo dá para olhar o funil e achar que
+   é o total do período quando na verdade é o recorte de uma campanha — foi
+   exatamente o que aconteceu. Esta barra torna o filtro impossível de não ver e
+   dá como sair dele. */
+function activeFilters(){
+  const out=[];
+  const lista=(set,rot,limpar)=>{ if(!set.size) return;
+    const v=[...set]; out.push({rot, txt: v.length===1?v[0]:v.length+' selecionados',
+      full:v.join(' · '), limpar}); };
+  lista(STATE.mSelC,'Campanha',()=>STATE.mSelC.clear());
+  lista(STATE.mSelA,'Conjunto',()=>STATE.mSelA.clear());
+  lista(STATE.mSelAd,'Anúncio',()=>STATE.mSelAd.clear());
+  if(STATE.selDays.size){ const v=[...STATE.selDays].sort();
+    out.push({rot:'Dias', txt: v.length===1?brdate(v[0]):v.length+' dias selecionados',
+      full:v.map(brdate).join(' · '), limpar:()=>STATE.selDays.clear()}); }
+  return out;
+}
+function renderFilterBar(){
+  const el=document.getElementById('filterBar'); if(!el) return;
+  const f=activeFilters();
+  document.getElementById('clearBtn').classList.toggle('active', f.length>0);
+  if(!f.length){ el.hidden=true; el.innerHTML=''; return; }
+  el.hidden=false;
+  el.innerHTML='<span class="fb-lead">Filtro ativo — os números abaixo são só deste recorte:</span>'
+    + f.map((x,i)=>`<span class="fb-chip" data-i="${i}" title="${escHtml(x.rot+': '+x.full)}">`
+        +`<b>${x.rot}:</b> ${escHtml(x.txt)}<button class="fb-x" type="button" aria-label="Remover filtro">✕</button></span>`).join('')
+    + '<button class="fb-all" type="button">Remover todos</button>';
+  el.querySelectorAll('.fb-x').forEach(b=>b.addEventListener('click',e=>{
+    e.stopPropagation(); f[+b.closest('.fb-chip').dataset.i].limpar(); renderAll(); }));
+  el.querySelector('.fb-all').addEventListener('click',()=>{
+    f.forEach(x=>x.limpar()); syncDateInputs(); renderAll(); });
+}
+
+function renderAll(){ renderFilterBar();
+  if(STATE.page==='meta') renderMeta(); else if(STATE.page==='rel') renderRelatorio(); else renderGeral(); }
 
 function applyTheme(){ const t=localStorage.getItem('dm_theme'); if(t==='light') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme','dark'); }
 applyTheme();

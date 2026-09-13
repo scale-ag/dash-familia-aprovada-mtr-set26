@@ -233,6 +233,21 @@ Cliques · CTR · CPC · Vis. LP · CR · CPV · Leads · ConvLP · CPL` (`DAILY
 `app.js`). As tabelas hierárquicas usam as mesmas métricas, trocando Data/Dia pela
 dimensão.
 
+### Barra de filtros ativos (`#filterBar`)
+Faixa logo abaixo da topbar, visível em **todas as páginas**, que aparece sempre
+que houver seleção de campanha/conjunto/anúncio ou de dias. Mostra um chip por
+filtro (com ✕ para remover só aquele) e "Remover todos"; o botão "Remover
+Filtros" da topbar também acende (`.btn.active`).
+
+**Por que existe:** clicar numa linha das tabelas hierárquicas filtra a página
+inteira, incluindo o funil e a tabela diária, que ficam ACIMA das tabelas onde o
+clique acontece. Sem aviso, dava para olhar o funil da página de mídia paga e
+achar que era o total do período quando era o recorte de uma campanha — foi um
+problema real relatado pelo cliente, e as páginas pareciam "não bater" entre si.
+
+`selDim()` chama `renderAll()` (não `renderMeta()` direto) justamente para a
+barra acompanhar o clique. Trocar de volta reintroduz o problema.
+
 **Regras obrigatórias das tabelas** (ver `GUIA-REPLICACAO.md`): cabeçalho sticky;
 ordenação tri‑state; colunas redimensionáveis (persist localStorage); linha
 "Total Geral" fixa; dimensão nunca truncada; seleção com toggle + Ctrl multi;
